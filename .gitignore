@@ -8,3 +8,4 @@ blob-report/
 playwright/.cache/
 .env
 *.log
+ai/.probe/
