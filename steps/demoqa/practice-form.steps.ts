@@ -2,11 +2,11 @@ import { expect } from '@playwright/test';
 import { DataTable } from 'playwright-bdd';
 import { Given, When, Then } from '../../support/fixtures';
 
-Given('que el usuario abre el formulario de practica', async ({ practiceFormPage }) => {
+Given('the user opens the practice form', async ({ practiceFormPage }) => {
   await practiceFormPage.open();
 });
 
-When('completa sus datos personales', async ({ practiceFormPage }, table: DataTable) => {
+When('the user fills in their personal details', async ({ practiceFormPage }, table: DataTable) => {
   const row = table.hashes()[0];
   await practiceFormPage.fillPersonalInfo({
     firstName: row.firstName,
@@ -16,42 +16,42 @@ When('completa sus datos personales', async ({ practiceFormPage }, table: DataTa
   });
 });
 
-When('selecciona el genero {string}', async ({ practiceFormPage }, gender: 'Male' | 'Female' | 'Other') => {
+When('selects gender {string}', async ({ practiceFormPage }, gender: 'Male' | 'Female' | 'Other') => {
   await practiceFormPage.selectGender(gender);
 });
 
-When('selecciona los hobbies {string} y {string}', async ({ practiceFormPage }, hobbyA: string, hobbyB: string) => {
+When('selects hobbies {string} and {string}', async ({ practiceFormPage }, hobbyA: string, hobbyB: string) => {
   await practiceFormPage.selectHobbies([hobbyA, hobbyB] as Array<'Sports' | 'Reading' | 'Music'>);
 });
 
 When(
-  'selecciona la fecha de nacimiento {string} {string} {string}',
+  'selects date of birth {string} {string} {string}',
   async ({ practiceFormPage }, day: string, month: string, year: string) => {
     await practiceFormPage.setDateOfBirth({ day, month, year });
   },
 );
 
-When('agrega la materia {string}', async ({ practiceFormPage }, subject: string) => {
+When('adds subject {string}', async ({ practiceFormPage }, subject: string) => {
   await practiceFormPage.addSubjects([subject]);
 });
 
-When('completa la direccion actual {string}', async ({ practiceFormPage }, address: string) => {
+When('fills in current address {string}', async ({ practiceFormPage }, address: string) => {
   await practiceFormPage.fillAddress({ currentAddress: address });
 });
 
-When('selecciona el estado {string} y la ciudad {string}', async ({ practiceFormPage }, state: string, city: string) => {
+When('selects state {string} and city {string}', async ({ practiceFormPage }, state: string, city: string) => {
   await practiceFormPage.selectStateAndCity(state, city);
 });
 
-When('envia el formulario', async ({ practiceFormPage }) => {
+When('submits the form', async ({ practiceFormPage }) => {
   await practiceFormPage.submit();
 });
 
-Then('se muestra el modal de confirmacion', async ({ practiceFormPage }) => {
+Then('the confirmation modal is shown', async ({ practiceFormPage }) => {
   expect(await practiceFormPage.isConfirmationVisible()).toBe(true);
 });
 
-Then('el modal muestra {string} con valor {string}', async ({ practiceFormPage }, label: string, value: string) => {
+Then('the modal shows {string} with value {string}', async ({ practiceFormPage }, label: string, value: string) => {
   const actual = await practiceFormPage.getModalRowValue(label);
   expect(actual).toBe(value);
 });

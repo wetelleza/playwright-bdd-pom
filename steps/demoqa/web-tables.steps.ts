@@ -3,11 +3,11 @@ import { DataTable } from 'playwright-bdd';
 import { Given, When, Then } from '../../support/fixtures';
 import type { RecordData } from '../../pages/demoqa/WebTablesPage';
 
-Given('que el usuario abre la pagina de web tables', async ({ webTablesPage }) => {
+Given('the user opens the web tables page', async ({ webTablesPage }) => {
   await webTablesPage.open();
 });
 
-Given('que existe un registro con email {string}', async ({ webTablesPage }, email: string) => {
+Given('a record with email {string} exists', async ({ webTablesPage }, email: string) => {
   await webTablesPage.addRecord({
     firstName: 'Test',
     lastName: 'User',
@@ -18,36 +18,36 @@ Given('que existe un registro con email {string}', async ({ webTablesPage }, ema
   });
 });
 
-When('agrega un registro con los siguientes datos', async ({ webTablesPage }, table: DataTable) => {
+When('adds a record with the following data', async ({ webTablesPage }, table: DataTable) => {
   const record = table.hashes()[0] as unknown as RecordData;
   await webTablesPage.addRecord(record);
 });
 
-When('busca {string}', async ({ webTablesPage }, term: string) => {
+When('searches for {string}', async ({ webTablesPage }, term: string) => {
   await webTablesPage.search(term);
 });
 
 When(
-  'edita el registro de {string} cambiando el salario a {string}',
+  'edits the record for {string} changing the salary to {string}',
   async ({ webTablesPage }, email: string, salary: string) => {
     await webTablesPage.editRow(email, { salary });
   },
 );
 
-When('borra el registro de {string}', async ({ webTablesPage }, email: string) => {
+When('deletes the record for {string}', async ({ webTablesPage }, email: string) => {
   await webTablesPage.deleteRow(email);
 });
 
-Then('la fila con email {string} es visible', async ({ webTablesPage }, email: string) => {
+Then('the row with email {string} is visible', async ({ webTablesPage }, email: string) => {
   const row = await webTablesPage.rowByEmail(email);
   await expect(row).toBeVisible();
 });
 
-Then('la fila con email {string} contiene el salario {string}', async ({ webTablesPage }, email: string, salary: string) => {
+Then('the row with email {string} contains salary {string}', async ({ webTablesPage }, email: string, salary: string) => {
   const row = await webTablesPage.rowByEmail(email);
   await expect(row).toContainText(salary);
 });
 
-Then('no hay filas visibles', async ({ webTablesPage }) => {
+Then('no rows are visible', async ({ webTablesPage }) => {
   expect(await webTablesPage.visibleRowCount()).toBe(0);
 });

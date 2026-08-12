@@ -35,10 +35,10 @@ function parseArgs(argv: string[]): CliArgs {
 
   const description = positional.join(' ').trim();
   if (!description) {
-    throw new Error('Falta la descripción del escenario. Uso: npm run ai:generate -- "descripción" --suite demoqa|saucedemo');
+    throw new Error('Missing scenario description. Usage: npm run ai:generate -- "description" --suite demoqa|saucedemo');
   }
   if (!suite || !SUITES.includes(suite as Suite)) {
-    throw new Error(`--suite es obligatorio y debe ser uno de: ${SUITES.join(', ')}`);
+    throw new Error(`--suite is required and must be one of: ${SUITES.join(', ')}`);
   }
 
   return { description, suite: suite as Suite, name, implementMissing };
@@ -66,33 +66,33 @@ function formatCatalog(catalog: StepDefinition[]): string {
 }
 
 function buildPrompt(description: string, suite: Suite, catalog: StepDefinition[], exampleFeature: string): { system: string; user: string } {
-  const system = `Eres un generador de escenarios Gherkin para un proyecto Playwright + playwright-bdd + Page Object Model.
+  const system = `You are a Gherkin scenario generator for a Playwright + playwright-bdd + Page Object Model project.
 
-Reglas estrictas:
-1. Solo puedes usar los steps del catálogo provisto, copiando el texto de cada patrón y reemplazando los placeholders ({string}, {int}, etc.) por valores concretos derivados del pedido del usuario. No cambies ni una palabra del texto fijo del patrón.
-2. Si para cumplir el pedido hace falta una acción que ningún step del catálogo cubre, NO inventes un step parecido y NO lo omitas en silencio. En el lugar exacto del Scenario donde iría esa acción, escribí una línea de comentario con este formato exacto (respetando la indentación de los steps): "${TODO_MARKER_PREFIX}<Keyword> <redacción propuesta con valores concretos, como si fuera el step real>". Ejemplo: "${TODO_MARKER_PREFIX}Then los precios quedan ordenados de mayor a menor".
-3. Genera Scenario concretos (no Scenario Outline) con valores literales.
-4. Respeta el estilo del archivo de ejemplo: idioma español en la redacción, uso de Background si aplica, indentación de 2 espacios.
-5. Responde EXACTAMENTE en este formato, sin texto adicional antes o después:
+Strict rules:
+1. You can only use steps from the provided catalog, copying each pattern's text and replacing the placeholders ({string}, {int}, etc.) with concrete values derived from the user's request. Don't change a single word of the pattern's fixed text.
+2. If fulfilling the request needs an action no catalog step covers, do NOT invent a similar step and do NOT silently drop it. In the exact spot in the Scenario where that action would go, write a comment line with this exact format (respecting step indentation): "${TODO_MARKER_PREFIX}<Keyword> <proposed wording with concrete values, as if it were the real step>". Example: "${TODO_MARKER_PREFIX}Then the prices end up sorted from highest to lowest".
+3. Generate concrete Scenarios (not Scenario Outline) with literal values.
+4. Match the style of the example file: English wording, use Background where it applies, 2-space indentation.
+5. Respond in EXACTLY this format, with no extra text before or after:
 
 \`\`\`gherkin
 @${suite}
-Feature: <título>
+Feature: <title>
   ...
 \`\`\``;
 
-  const user = `Catálogo de steps existentes para el suite "${suite}" (única fuente de verdad, no existen otros):
+  const user = `Catalog of existing steps for suite "${suite}" (the single source of truth, no others exist):
 ${formatCatalog(catalog)}
 
-Ejemplo de estilo de un .feature existente del mismo suite:
+Style example from an existing .feature in the same suite:
 \`\`\`gherkin
 ${exampleFeature}
 \`\`\`
 
-Pedido del usuario en lenguaje natural:
+User's request in natural language:
 "${description}"
 
-Generá el escenario Gherkin siguiendo las reglas.`;
+Generate the Gherkin scenario following the rules.`;
 
   return { system, user };
 }
@@ -117,13 +117,13 @@ async function main() {
 
   const catalog = extractStepCatalog(args.suite, repoRoot);
   if (catalog.length === 0) {
-    throw new Error(`No se encontraron steps para el suite "${args.suite}" en steps/${args.suite}/`);
+    throw new Error(`No steps found for suite "${args.suite}" in steps/${args.suite}/`);
   }
   const exampleFeature = readExampleFeature(repoRoot, args.suite);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('Falta ANTHROPIC_API_KEY (configurala en .env, ver .env.example)');
+    throw new Error('Missing ANTHROPIC_API_KEY (set it in .env, see .env.example)');
   }
   const anthropic = new Anthropic({ apiKey });
   const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
@@ -147,19 +147,19 @@ async function main() {
   const { groundedText } = groundScenario(rawFeature, catalog);
   const markedFeature = ensureAiMarkers(groundedText.trim());
 
-  // Canal único de "falta esto": líneas que el propio LLM marcó a propósito (regla 2 del prompt)
-  // más las que groundScenario detectó como red de seguridad (steps que sí escribió pero alucinó).
+  // Single "missing" channel: lines the LLM itself marked on purpose (prompt rule 2) plus the
+  // ones groundScenario caught as a safety net (steps it did write but hallucinated).
   const missingLines = extractTodoLines(markedFeature);
 
-  const header = '# Generado por IA (ai:generate) — revisar antes de mergear';
+  const header = '# Generated by AI (ai:generate) — review before merging';
 
   const outDir = join(repoRoot, 'features', args.suite);
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
   const slug = args.name ? slugify(args.name) : slugify(args.description);
   const outPath = join(outDir, `${slug}.feature`);
 
-  // Se escribe temprano: --implement-missing necesita un archivo real bajo features/<suite>/
-  // para poder correrlo con bddgen + playwright test.
+  // Written early: --implement-missing needs a real file under features/<suite>/ to be able
+  // to run it with bddgen + playwright test.
   writeFileSync(outPath, `${header}\n${markedFeature}\n`, 'utf-8');
 
   let allMissing = missingLines;
@@ -169,17 +169,17 @@ async function main() {
   }
   const missingBlock =
     allMissing.length > 0
-      ? `\n# Steps faltantes (no implementados, revisar/implementar antes de habilitar este escenario):\n${allMissing.map((s) => `#   ${s}`).join('\n')}\n`
+      ? `\n# Missing steps (not implemented, review/implement before enabling this scenario):\n${allMissing.map((s) => `#   ${s}`).join('\n')}\n`
       : '';
 
   if (missingBlock) appendFileSync(outPath, missingBlock, 'utf-8');
 
-  console.log(`\nEscenario generado: ${outPath}`);
+  console.log(`\nScenario generated: ${outPath}`);
   if (allMissing.length > 0) {
-    console.log('\nSteps faltantes:');
+    console.log('\nMissing steps:');
     for (const step of allMissing) console.log(`  - ${step}`);
   } else {
-    console.log('Todos los steps usados ya existen o se implementaron y verificaron.');
+    console.log('All steps used already existed or were implemented and verified.');
   }
 }
 

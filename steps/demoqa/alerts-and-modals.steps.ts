@@ -1,54 +1,54 @@
 import { expect } from '@playwright/test';
 import { Given, When, Then } from '../../support/fixtures';
 
-Given('que el usuario abre la pagina de alertas', async ({ alertsModalsPage }) => {
+Given('the user opens the alerts page', async ({ alertsModalsPage }) => {
   await alertsModalsPage.open();
 });
 
-Given('que el usuario abre la pagina de modales', async ({ alertsModalsPage }) => {
+Given('the user opens the modals page', async ({ alertsModalsPage }) => {
   await alertsModalsPage.openModals();
 });
 
-When('dispara la alerta simple', async ({ alertsModalsPage }) => {
+When('triggers the simple alert', async ({ alertsModalsPage }) => {
   await alertsModalsPage.triggerSimpleAlert();
 });
 
-When('dispara la alerta con temporizador', async ({ alertsModalsPage }) => {
+When('triggers the timed alert', async ({ alertsModalsPage }) => {
   await alertsModalsPage.triggerTimerAlert();
 });
 
-Then('el mensaje de la alerta fue {string}', async ({ alertsModalsPage }, expected: string) => {
+Then('the alert message was {string}', async ({ alertsModalsPage }, expected: string) => {
   expect(alertsModalsPage.getLastDialogMessage()).toBe(expected);
 });
 
-When('responde el dialogo de confirmacion con {string}', async ({ alertsModalsPage }, respuesta: string) => {
-  await alertsModalsPage.triggerConfirm(respuesta === 'aceptar');
+When('responds to the confirmation dialog with {string}', async ({ alertsModalsPage }, answer: string) => {
+  await alertsModalsPage.triggerConfirm(answer === 'accept');
 });
 
-Then('el resultado de la confirmacion es {string}', async ({ alertsModalsPage }, expected: string) => {
+Then('the confirmation result is {string}', async ({ alertsModalsPage }, expected: string) => {
   expect(await alertsModalsPage.confirmResultText()).toContain(expected);
 });
 
-When('responde el prompt con el texto {string}', async ({ alertsModalsPage }, text: string) => {
+When('responds to the prompt with the text {string}', async ({ alertsModalsPage }, text: string) => {
   await alertsModalsPage.triggerPrompt(text);
 });
 
-Then('el resultado del prompt es {string}', async ({ alertsModalsPage }, expected: string) => {
+Then('the prompt result is {string}', async ({ alertsModalsPage }, expected: string) => {
   expect(await alertsModalsPage.promptResultText()).toContain(expected);
 });
 
-When('abre el modal pequeno', async ({ alertsModalsPage }) => {
+When('opens the small modal', async ({ alertsModalsPage }) => {
   await alertsModalsPage.openSmallModal();
 });
 
-When('cierra el modal', async ({ alertsModalsPage }) => {
+When('closes the modal', async ({ alertsModalsPage }) => {
   await alertsModalsPage.closeModal();
 });
 
-Then('el modal esta visible', async ({ alertsModalsPage }) => {
+Then('the modal is visible', async ({ alertsModalsPage }) => {
   expect(await alertsModalsPage.isModalVisible()).toBe(true);
 });
 
-Then('el modal ya no esta visible', async ({ alertsModalsPage }) => {
+Then('the modal is no longer visible', async ({ alertsModalsPage }) => {
   expect(await alertsModalsPage.isModalVisible()).toBe(false);
 });

@@ -1,27 +1,27 @@
 @demoqa
-Feature: Tabla dinámica de DemoQA (CRUD)
-  Como usuario del sitio DemoQA
-  Quiero crear, buscar, editar y borrar registros en la tabla
-  Para verificar que Playwright maneja modales, filtros dinámicos y grillas basadas en React
+Feature: DemoQA dynamic table (CRUD)
+  As a DemoQA user
+  I want to create, search, edit and delete records in the table
+  So that I can verify Playwright handles modals, dynamic filters and React-based grids
 
   Background:
-    Given que el usuario abre la pagina de web tables
+    Given the user opens the web tables page
 
-  Scenario: Crear un nuevo registro y encontrarlo con el buscador
-    When agrega un registro con los siguientes datos
+  Scenario: Create a new record and find it with the search box
+    When adds a record with the following data
       | firstName | lastName | email             | age | salary | department |
       | Grace     | Hopper   | grace@example.com | 85  | 9000   | Engineering |
-    And busca "grace@example.com"
-    Then la fila con email "grace@example.com" es visible
+    And searches for "grace@example.com"
+    Then the row with email "grace@example.com" is visible
 
-  Scenario: Editar un registro existente
-    Given que existe un registro con email "edit.me@example.com"
-    When edita el registro de "edit.me@example.com" cambiando el salario a "12000"
-    And busca "edit.me@example.com"
-    Then la fila con email "edit.me@example.com" contiene el salario "12000"
+  Scenario: Edit an existing record
+    Given a record with email "edit.me@example.com" exists
+    When edits the record for "edit.me@example.com" changing the salary to "12000"
+    And searches for "edit.me@example.com"
+    Then the row with email "edit.me@example.com" contains salary "12000"
 
-  Scenario: Borrar un registro
-    Given que existe un registro con email "delete.me@example.com"
-    When borra el registro de "delete.me@example.com"
-    And busca "delete.me@example.com"
-    Then no hay filas visibles
+  Scenario: Delete a record
+    Given a record with email "delete.me@example.com" exists
+    When deletes the record for "delete.me@example.com"
+    And searches for "delete.me@example.com"
+    Then no rows are visible

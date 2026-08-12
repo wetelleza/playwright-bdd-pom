@@ -9,3 +9,4 @@ playwright/.cache/
 .env
 *.log
 ai/.probe/
+executive-report/

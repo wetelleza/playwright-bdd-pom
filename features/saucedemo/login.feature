@@ -1,20 +1,20 @@
 @saucedemo
-Feature: Login en SauceDemo
-  Como usuario de SauceDemo
-  Quiero iniciar sesion con distintos tipos de usuarios
-  Para verificar los distintos escenarios de autenticacion
+Feature: SauceDemo login
+  As a SauceDemo user
+  I want to log in with different types of users
+  So that I can verify the different authentication scenarios
 
-  Scenario: Login exitoso con usuario estandar
-    Given que el usuario esta en la pagina de login de SauceDemo
-    When inicia sesion con usuario "standard_user" y password "secret_sauce"
-    Then el usuario llega al listado de productos
+  Scenario: Successful login with a standard user
+    Given the user is on the SauceDemo login page
+    When logs in with user "standard_user" and password "secret_sauce"
+    Then the user lands on the products list
 
-  Scenario: Login bloqueado
-    Given que el usuario esta en la pagina de login de SauceDemo
-    When inicia sesion con usuario "locked_out_user" y password "secret_sauce"
-    Then se muestra el error "Epic sadface: Sorry, this user has been locked out."
+  Scenario: Locked out login
+    Given the user is on the SauceDemo login page
+    When logs in with user "locked_out_user" and password "secret_sauce"
+    Then the error "Epic sadface: Sorry, this user has been locked out." is shown
 
-  Scenario: Login con credenciales invalidas
-    Given que el usuario esta en la pagina de login de SauceDemo
-    When inicia sesion con usuario "usuario_invalido" y password "clave_invalida"
-    Then se muestra el error "Epic sadface: Username and password do not match any user in this service"
+  Scenario: Login with invalid credentials
+    Given the user is on the SauceDemo login page
+    When logs in with user "invalid_user" and password "invalid_password"
+    Then the error "Epic sadface: Username and password do not match any user in this service" is shown

@@ -1,7 +1,7 @@
 {
   "name": "playwright-bdd-pom",
   "version": "1.0.0",
-  "description": "Playwright + TypeScript + Gherkin (BDD) + Page Object Model, con CI en GitHub Actions",
+  "description": "Playwright + TypeScript + Gherkin (BDD) + Page Object Model, with CI on GitHub Actions",
   "private": true,
   "scripts": {
     "test": "npx bddgen && playwright test",
@@ -10,6 +10,7 @@
     "test:demoqa": "npx bddgen && playwright test --grep @demoqa",
     "test:saucedemo": "npx bddgen && playwright test --grep @saucedemo",
     "report": "playwright show-report",
+    "report:exec": "tsx report/generateExecutiveReport.ts",
     "codegen": "playwright codegen",
     "ai:generate": "tsx ai/generateScenario.ts"
   },

@@ -15,8 +15,8 @@ export interface StudentData {
   city: string;
 }
 
-/** https://demoqa.com/automation-practice-form — formulario con widgets complejos:
- *  date picker, autocomplete de subjects, react-select dependiente (State/City) y modal de confirmacion. */
+/** https://demoqa.com/automation-practice-form — form with complex widgets:
+ *  date picker, subject autocomplete, dependent react-select (State/City) and confirmation modal. */
 export class PracticeFormPage extends BasePage {
   private readonly firstName: Locator;
   private readonly lastName: Locator;
@@ -49,7 +49,7 @@ export class PracticeFormPage extends BasePage {
 
   async open(): Promise<void> {
     await this.goto('/automation-practice-form');
-    // El sitio incrusta anuncios que pueden tapar el formulario: los quitamos para estabilizar los clics.
+    // The site embeds ads that can cover the form: we remove them to make clicks reliable.
     await this.page.addStyleTag({ content: '#fixedban, .footer { display: none !important; }' }).catch(() => {});
   }
 
@@ -70,7 +70,7 @@ export class PracticeFormPage extends BasePage {
     }
   }
 
-  /** Widget de date picker: navega mes/año en vez de escribir texto libre. */
+  /** Date picker widget: navigates month/year instead of typing free text. */
   async setDateOfBirth({ day, month, year }: StudentData['dateOfBirth']): Promise<void> {
     await this.dateOfBirthInput.click();
     await this.page.locator('.react-datepicker__month-select').selectOption({ label: month });
@@ -80,7 +80,7 @@ export class PracticeFormPage extends BasePage {
       .click();
   }
 
-  /** Autocomplete: escribe y selecciona de la lista de sugerencias que aparece dinámicamente. */
+  /** Autocomplete: types and selects from the suggestion list that appears dynamically. */
   async addSubjects(subjects: string[]): Promise<void> {
     for (const subject of subjects) {
       await this.subjectsInput.fill(subject);
@@ -96,7 +96,7 @@ export class PracticeFormPage extends BasePage {
     await this.currentAddress.fill(data.currentAddress);
   }
 
-  /** react-select: no son <select> nativos, requieren click + click en la opción renderizada. */
+  /** react-select: not native <select> elements, requires click + click on the rendered option. */
   async selectStateAndCity(state: string, city: string): Promise<void> {
     await this.stateDropdown.click();
     await this.page.locator('#react-select-3-input').fill(state);

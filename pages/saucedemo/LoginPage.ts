@@ -16,7 +16,7 @@ export class LoginPage extends BasePage {
   }
 
   async open(): Promise<void> {
-    // URL absoluta: SauceDemo vive en un dominio distinto al baseURL (demoqa.com) configurado por defecto.
+    // Absolute URL: SauceDemo lives on a different domain than the default baseURL (demoqa.com).
     await this.goto('https://www.saucedemo.com/');
   }
 

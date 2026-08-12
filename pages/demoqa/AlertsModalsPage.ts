@@ -1,7 +1,7 @@
 import type { Dialog, Locator, Page } from '@playwright/test';
 import { BasePage } from '../common/BasePage';
 
-/** https://demoqa.com/alertsWindows — diálogos nativos del navegador (alert/confirm/prompt) y modales bootstrap. */
+/** https://demoqa.com/alertsWindows — native browser dialogs (alert/confirm/prompt) and bootstrap modals. */
 export class AlertsModalsPage extends BasePage {
   private readonly alertButton: Locator;
   private readonly timerAlertButton: Locator;
@@ -30,7 +30,7 @@ export class AlertsModalsPage extends BasePage {
     await this.goto('/alerts');
   }
 
-  /** Registra el handler de dialogo ANTES de disparar la acción: los diálogos nativos son eventos, no elementos del DOM. */
+  /** Registers the dialog handler BEFORE triggering the action: native dialogs are events, not DOM elements. */
   private async triggerDialog(trigger: () => Promise<void>, accept: boolean, promptText?: string): Promise<void> {
     const dialogPromise = new Promise<void>((resolve) => {
       this.page.once('dialog', async (dialog: Dialog) => {

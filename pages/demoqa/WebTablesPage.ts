@@ -10,7 +10,7 @@ export interface RecordData {
   department: string;
 }
 
-/** https://demoqa.com/webtables — tabla dinámica con CRUD vía modal, búsqueda y paginación. */
+/** https://demoqa.com/webtables — dynamic table with CRUD via modal, search and pagination. */
 export class WebTablesPage extends BasePage {
   private readonly addButton: Locator;
   private readonly searchBox: Locator;

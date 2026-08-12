@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { BasePage } from '../common/BasePage';
+import { captureProbe } from '../../ai/probeRuntime';
 
 export type SortOption = 'az' | 'za' | 'lohi' | 'hilo';
 
@@ -49,5 +50,14 @@ export class InventoryPage extends BasePage {
 
   async goToCart(): Promise<void> {
     await this.cartLink.click();
+  }
+
+  async firstItemIsMostExpensive(): Promise<void> {
+    const prices = await this.page.locator('[data-test="inventory-item-price"]').allTextContents();
+    const numericPrices = prices.map((price) => parseFloat(price.replace('$', '')));
+    const maxPrice = Math.max(...numericPrices);
+    if (numericPrices[0] !== maxPrice) {
+      throw new Error(`Expected first item price ${numericPrices[0]} to be the most expensive (${maxPrice})`);
+    }
   }
 }

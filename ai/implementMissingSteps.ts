@@ -42,7 +42,7 @@ function extractCode(text: string): string | null {
 
 function formatPageObjectCatalog(catalog: PageObjectDefinition[]): string {
   return catalog
-    .map((p) => `- ${p.className} (fixture: ${p.fixtureName}, ${p.filePath})\n  Métodos existentes: ${p.methods.join(', ') || '(ninguno)'}`)
+    .map((p) => `- ${p.className} (fixture: ${p.fixtureName}, ${p.filePath})\n  Existing methods: ${p.methods.join(', ') || '(none)'}`)
     .join('\n');
 }
 
@@ -70,28 +70,28 @@ async function planImplementation(
   missingLine: string,
   pageCatalog: PageObjectDefinition[],
 ): Promise<Plan | null> {
-  const system = `Sos un asistente que decide cómo implementar un step de Playwright/Gherkin que falta.
-Respondé EXCLUSIVAMENTE con un bloque \`\`\`json con estas claves:
+  const system = `You're an assistant that decides how to implement a missing Playwright/Gherkin step.
+Respond EXCLUSIVELY with a \`\`\`json block with these keys:
 {
-  "pageClassName": "<uno de los Page Objects listados>",
-  "methodName": "<nombre de método nuevo o existente, camelCase>",
-  "methodParams": "<lista de parámetros TS, ej. 'code: string', o vacío si no hace falta>",
-  "methodReturnType": "<ej. Promise<void>>",
+  "pageClassName": "<one of the listed Page Objects>",
+  "methodName": "<new or existing method name, camelCase>",
+  "methodParams": "<TS parameter list, e.g. 'code: string', or empty if not needed>",
+  "methodReturnType": "<e.g. Promise<void>>",
   "stepKeyword": "Given" | "When" | "Then",
   "stepPattern": "<cucumber expression>",
-  "stepDefinitionCode": "<código TS completo del step definition, estilo del repo>"
+  "stepDefinitionCode": "<full TS code for the step definition, in this repo's style>"
 }
 
-Reglas:
-1. "stepPattern" DEBE matchear textualmente la línea Gherkin original de abajo, reemplazando únicamente los valores literales entre comillas por {string} (o números por {int}) — no cambies ninguna otra palabra.
-2. Si en "Métodos existentes" del Page Object elegido ya hay uno que sirve para esto, reutilizalo (mismo methodName) en vez de proponer uno nuevo.
-3. "stepDefinitionCode" debe ser SOLO la llamada a Given/When/Then, sin ningún "import": el archivo destino ya tiene arriba "import { expect } from '@playwright/test'; import { Given, When, Then } from '../../support/fixtures';". Formato exacto: ${'${stepKeyword}'}('<pattern>', async ({ fixtureName }, ...args) => { await fixtureName.methodName(...); });`;
+Rules:
+1. "stepPattern" MUST match the original Gherkin line below word for word, only replacing the literal quoted values with {string} (or numbers with {int}) — don't change any other word.
+2. If the chosen Page Object's "Existing methods" already has one that serves this purpose, reuse it (same methodName) instead of proposing a new one.
+3. "stepDefinitionCode" must be ONLY the Given/When/Then call, with no "import": the target file already has "import { expect } from '@playwright/test'; import { Given, When, Then } from '../../support/fixtures';" at the top. Exact format: ${'${stepKeyword}'}('<pattern>', async ({ fixtureName }, ...args) => { await fixtureName.methodName(...); });`;
 
   const user = `Suite: ${suite}
-Línea Gherkin faltante (original, con valores concretos):
+Missing Gherkin line (original, with concrete values):
 ${missingLine}
 
-Page Objects disponibles:
+Available Page Objects:
 ${formatPageObjectCatalog(pageCatalog)}`;
 
   const text = await askClaude(anthropic, model, system, user);
@@ -114,39 +114,40 @@ async function generateMethodBody(
   digest: DomElementSummary[],
   previousError: string | null,
 ): Promise<string | null> {
-  const system = `Sos un generador de métodos de Page Object para Playwright + TypeScript.
-Tenés que escribir la implementación real de un método, usando SOLO los selectores reales listados abajo (copiándolos literalmente) — no inventes ningún page.getBy…/page.locator(...) que no esté en la lista.
-Respondé EXCLUSIVAMENTE con un bloque \`\`\`typescript que contenga el método completo (firma + cuerpo), con esta firma exacta:
+  const system = `You're a Page Object method generator for Playwright + TypeScript.
+You have to write the real implementation of a method, using ONLY the real selectors listed below (copying them literally) — don't invent any page.getBy…/page.locator(...) that isn't in the list.
+Respond EXCLUSIVELY with a \`\`\`typescript block containing the full method (signature + body), with this exact signature:
 async ${plan.methodName}(${plan.methodParams}): ${plan.methodReturnType} { ... }`;
 
-  const user = `Acción que debe cumplir el método (derivada de este step Gherkin):
+  const user = `Action the method must fulfil (derived from this Gherkin step):
 ${missingLine}
 
-Selectores reales disponibles en la página en este punto del flujo (elegí entre estos, no inventes otros):
+Real selectors available on the page at this point in the flow (pick among these, don't invent others):
 ${formatDigest(digest)}
-${previousError ? `\nEl intento anterior falló al correr el test real, con este error:\n${previousError.slice(-3000)}\n\nCorregí la implementación teniendo esto en cuenta.` : ''}`;
+${previousError ? `\nThe previous attempt failed when running the real test, with this error:\n${previousError.slice(-3000)}\n\nFix the implementation taking this into account.` : ''}`;
 
   const text = await askClaude(anthropic, model, system, user);
   return extractCode(text);
 }
 
-// spawnSync('npx.cmd', [...]) sin shell tira EINVAL en Windows (bug conocido de Node al spawnear
-// .cmd directamente). shell:true con un array de args tampoco sirve: Node solo concatena, no cita,
-// así que "Ordenar productos de mayor a menor precio" se partía en argumentos sueltos y --grep
-// terminaba matcheando cualquier escenario con "Ordenar". La solución que funciona en los dos
-// sistemas: un único string de comando con shell:true, citando a mano el valor de --grep.
+// spawnSync('npx.cmd', [...]) without shell throws EINVAL on Windows (a known Node bug when
+// spawning .cmd files directly). shell:true with an args array doesn't work either: Node only
+// concatenates, it doesn't quote, so "Sort products from highest to lowest price" would get
+// split into loose arguments and --grep ended up matching any scenario with "Sort" in it. The
+// fix that works on both systems: a single command string with shell:true, quoting the --grep
+// value by hand.
 function shQuote(value: string): string {
   return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 function runPlaywright(repoRoot: string, grepTitle: string): { exitCode: number; output: string } {
   const bddgen = spawnSync('npx bddgen', [], { cwd: repoRoot, encoding: 'utf-8', shell: true });
-  // Solo chromium: el loop de sonda/reintentos corre el escenario varias veces, no hace falta
-  // pagar 3 browsers por intento — la verificación cross-browser final la hace `npm test`.
+  // Chromium only: the probe/retry loop runs the scenario several times, no need to pay for
+  // 3 browsers per attempt — the final cross-browser check is `npm test`'s job.
   const testCmd = `npx playwright test --grep ${shQuote(escapeRegExp(grepTitle))} --project=chromium --reporter=line`;
   const test = spawnSync(testCmd, [], { cwd: repoRoot, encoding: 'utf-8', shell: true });
-  // Sin truncar: la detección del marcador de sonda busca en todo el output. Quien lo mande a un
-  // prompt (generateMethodBody) trunca recién ahí, para no arriesgarse a cortar el marcador.
+  // Not truncated: probe-marker detection searches the whole output. Whoever sends it into a
+  // prompt (generateMethodBody) truncates only there, to avoid risking cutting off the marker.
   const errorText = [bddgen.error?.message, test.error?.message].filter(Boolean).join('\n');
   const output = `${bddgen.stdout ?? ''}${bddgen.stderr ?? ''}${test.stdout ?? ''}${test.stderr ?? ''}${errorText}`;
   return { exitCode: test.error ? 1 : (test.status ?? 1), output };
@@ -157,7 +158,7 @@ function extractScenarioTitle(featureText: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-/** Solo se llama una vez por step faltante (no por intento): el step definition no cambia entre reintentos, solo el cuerpo del método. */
+/** Only called once per missing step (not per attempt): the step definition doesn't change between retries, only the method body does. */
 function appendGeneratedStep(repoRoot: string, suite: Suite, stepDefinitionCode: string): void {
   const filePath = join(repoRoot, 'steps', suite, 'ai-generated.steps.ts');
   if (!existsSync(filePath)) {
@@ -167,8 +168,8 @@ function appendGeneratedStep(repoRoot: string, suite: Suite, stepDefinitionCode:
       'utf-8',
     );
   }
-  // Red de seguridad: el archivo ya trae los imports que hacen falta arriba (Given/When/Then/expect).
-  // Si el LLM igual escribió alguno propio (ignorando la instrucción), se descarta antes de escribir.
+  // Safety net: the file already has the imports it needs at the top (Given/When/Then/expect).
+  // If the LLM wrote its own anyway (ignoring the instruction), it's dropped before writing.
   const codeWithoutImports = stepDefinitionCode
     .split('\n')
     .filter((line) => !/^\s*import\s/.test(line))
@@ -182,10 +183,10 @@ export interface ImplementReport {
 }
 
 /**
- * Para cada línea `# TODO_AI_MISSING: ...` dejada por ai/grounding.ts, intenta escribir el
- * método de Page Object + step real, verificado contra el DOM real y corrido de verdad, con
- * reintentos acotados. Opera directo sobre `featurePath` (tiene que ser un archivo real bajo
- * features/<suite>/, porque bddgen + playwright test necesitan encontrarlo en disco para correrlo).
+ * For each `# TODO_AI_MISSING: ...` line left by ai/grounding.ts, tries to write the Page
+ * Object method + real step, verified against the real DOM and actually run, with bounded
+ * retries. Operates directly on `featurePath` (has to be a real file under features/<suite>/,
+ * because bddgen + playwright test need to find it on disk to run it).
  */
 export async function implementMissingSteps(
   anthropic: Anthropic,
@@ -199,13 +200,13 @@ export async function implementMissingSteps(
   const grepTitle = extractScenarioTitle(readFileSync(featurePath, 'utf-8'));
 
   for (const missingLine of missingLines) {
-    console.log(`\nImplementando: ${missingLine}`);
+    console.log(`\nImplementing: ${missingLine}`);
     const todoLine = `${TODO_MARKER_PREFIX}${missingLine}`;
 
     const pageCatalog = extractPageObjectCatalog(suite, repoRoot);
     const plan = await planImplementation(anthropic, model, suite, missingLine, pageCatalog);
     if (!plan || !grepTitle) {
-      console.log('  No se pudo planificar una implementación válida.');
+      console.log('  Could not plan a valid implementation.');
       unresolved.push(missingLine);
       continue;
     }
@@ -215,24 +216,24 @@ export async function implementMissingSteps(
     const isReuse = page.methods.includes(plan.methodName);
 
     appendGeneratedStep(repoRoot, suite, plan.stepDefinitionCode);
-    // Habilita el step en el escenario real para poder correrlo (se revierte más abajo si no se verifica).
+    // Enables the step in the real scenario so it can be run (reverted below if it doesn't verify).
     replaceInFile(featurePath, todoLine, missingLine);
 
     let resolved = false;
     let lastError: string | null = null;
 
     if (isReuse) {
-      console.log(`  Reutilizando método existente ${plan.pageClassName}.${plan.methodName} (sin duplicar).`);
-      // Mismo margen de reintentos que la rama de implementación nueva: una corrida sola contra
-      // un sitio real puede fallar por algo transitorio (red, timing), no solo por lógica.
+      console.log(`  Reusing existing method ${plan.pageClassName}.${plan.methodName} (no duplication).`);
+      // Same retry margin as the new-implementation branch: a single run against a real site
+      // can fail for something transient (network, timing), not just logic.
       for (let attempt = 1; attempt <= MAX_ATTEMPTS && !resolved; attempt++) {
         const run = runPlaywright(repoRoot, grepTitle);
         resolved = run.exitCode === 0;
         if (resolved) {
-          console.log(`  Intento ${attempt}: OK, el escenario pasa.`);
+          console.log(`  Attempt ${attempt}: OK, the scenario passes.`);
         } else {
           lastError = run.output;
-          console.log(`  Intento ${attempt}: el test falló.`);
+          console.log(`  Attempt ${attempt}: the test failed.`);
         }
       }
     } else {
@@ -248,7 +249,7 @@ export async function implementMissingSteps(
 
         const probeRun = runPlaywright(repoRoot, grepTitle);
         if (!probeRun.output.includes(PROBE_MARKER)) {
-          console.log(`  Intento ${attempt}: la sonda no llegó a capturar el DOM (fallo previo en el flujo).`);
+          console.log(`  Attempt ${attempt}: the probe didn't manage to capture the DOM (earlier failure in the flow).`);
           lastError = probeRun.output;
           continue;
         }
@@ -256,31 +257,31 @@ export async function implementMissingSteps(
         const digest = readProbe(probeId);
         const methodCode = await generateMethodBody(anthropic, model, missingLine, plan, digest, lastError);
         if (!methodCode) {
-          console.log(`  Intento ${attempt}: no se pudo generar una implementación parseable.`);
+          console.log(`  Attempt ${attempt}: could not generate a parseable implementation.`);
           continue;
         }
 
         const grounding = groundGeneratedCode(methodCode, digest);
         if (!grounding.ok) {
-          console.log(`  Intento ${attempt}: selectores no verificados en el DOM real: ${grounding.invalidCalls.join(', ')}`);
-          lastError = `Usaste selectores que no existen en el digest: ${grounding.invalidCalls.join(', ')}`;
+          console.log(`  Attempt ${attempt}: selectors not verified against the real DOM: ${grounding.invalidCalls.join(', ')}`);
+          lastError = `You used selectors that don't exist in the digest: ${grounding.invalidCalls.join(', ')}`;
           continue;
         }
 
         replacePageObjectMethod(pageFilePath, plan.pageClassName, plan.methodName, methodCode);
         const realRun = runPlaywright(repoRoot, grepTitle);
         if (realRun.exitCode === 0) {
-          console.log(`  Intento ${attempt}: OK, el escenario pasa.`);
+          console.log(`  Attempt ${attempt}: OK, the scenario passes.`);
           resolved = true;
         } else {
-          console.log(`  Intento ${attempt}: el test falló, reintentando con el error como contexto.`);
+          console.log(`  Attempt ${attempt}: the test failed, retrying with the error as context.`);
           lastError = realRun.output;
         }
       }
     }
 
     if (!resolved) {
-      // No se deja un escenario activo que no se sabe si pasa: se revierte el step a "faltante".
+      // Never leave an active scenario whose outcome is unknown: the step is reverted to "missing".
       replaceInFile(featurePath, missingLine, todoLine);
       if (!isReuse) {
         try {
@@ -288,13 +289,13 @@ export async function implementMissingSteps(
             pageFilePath,
             plan.pageClassName,
             plan.methodName,
-            `${AI_UNVERIFIED_PREFIX}\nasync ${plan.methodName}(${plan.methodParams}): ${plan.methodReturnType} {\n  throw new Error('Implementación IA sin verificar automáticamente');\n}`,
+            `${AI_UNVERIFIED_PREFIX}\nasync ${plan.methodName}(${plan.methodParams}): ${plan.methodReturnType} {\n  throw new Error('Unverified AI implementation');\n}`,
           );
         } catch {
-          // No se llegó a insertar ningún stub (falló antes de eso): no hay nada que marcar.
+          // No stub was ever inserted (it failed before that): nothing to mark.
         }
       }
-      unresolved.push(`${missingLine} (intentado, no verificado — revisar ${plan.pageClassName}.${plan.methodName})`);
+      unresolved.push(`${missingLine} (attempted, not verified — review ${plan.pageClassName}.${plan.methodName})`);
     }
   }
 

@@ -17,6 +17,7 @@ export default defineConfig({
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
+    ['json', { outputFile: 'test-results/results.json' }],
     cucumberReporter('html', { outputFile: 'cucumber-report/report.html' }),
   ],
   use: {

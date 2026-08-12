@@ -5,10 +5,10 @@ import type { StepDefinition, StepKeyword, Suite } from './types';
 const STEP_CALL_PATTERN = /\b(Given|When|Then)\s*\(\s*'((?:[^'\\]|\\.)*)'/g;
 
 /**
- * Se recalcula en memoria en cada corrida (sin cachear a disco): a este tamaño de
- * catálogo (~decenas de steps) es instantáneo y evita que quede desactualizado.
- * Cuando el catálogo crezca mucho, este es el punto a reemplazar por un índice
- * precomputado (ej. embeddings) en vez de reparsear los .steps.ts en cada llamada.
+ * Recomputed in memory on every run (no disk cache): at this catalog size (a few dozen
+ * steps) it's instant and avoids the catalog going stale. When the catalog grows a lot,
+ * this is the point to replace with a precomputed index (e.g. embeddings) instead of
+ * re-parsing the .steps.ts files on every call.
  */
 export function extractStepCatalog(suite: Suite, repoRoot: string = process.cwd()): StepDefinition[] {
   const stepsDir = join(repoRoot, 'steps', suite);

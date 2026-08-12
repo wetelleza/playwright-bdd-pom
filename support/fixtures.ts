@@ -15,7 +15,7 @@ interface PageObjectFixtures {
   checkoutPage: CheckoutPage;
 }
 
-/** Cada fixture instancia su Page Object bajo demanda: los steps solo piden lo que usan. */
+/** Each fixture instantiates its Page Object on demand: steps only ask for what they use. */
 export const test = base.extend<PageObjectFixtures>({
   practiceFormPage: async ({ page }, use) => use(new PracticeFormPage(page)),
   webTablesPage: async ({ page }, use) => use(new WebTablesPage(page)),

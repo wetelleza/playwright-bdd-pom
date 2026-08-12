@@ -29,11 +29,12 @@ export function matchesPattern(pattern: string, stepText: string): boolean {
 export const TODO_MARKER_PREFIX = '# TODO_AI_MISSING: ';
 
 /**
- * Barrera anti-alucinación: no basta con pedirle al LLM que reutilice steps existentes,
- * hay que verificarlo. Cualquier línea Given/When/Then/And/But que no matchee ningún step
- * real del catálogo se reemplaza en el lugar por un comentario `# TODO_AI_MISSING: <línea>`
- * (Gherkin válido, bddgen lo ignora) en vez de borrarla — así la fase de implementación
- * (--implement-missing) sabe exactamente dónde reinsertar el step real si logra escribirlo.
+ * Anti-hallucination barrier: it's not enough to ask the LLM to reuse existing steps,
+ * it has to be verified. Any Given/When/Then/And/But line that doesn't match a real step
+ * from the catalog gets replaced in place with a `# TODO_AI_MISSING: <line>` comment
+ * (valid Gherkin, bddgen ignores it) instead of being deleted — that way the implementation
+ * phase (--implement-missing) knows exactly where to reinsert the real step if it manages
+ * to write one.
  */
 export function groundScenario(
   featureText: string,
@@ -44,7 +45,7 @@ export function groundScenario(
 
   const groundedLines = featureText.split('\n').map((line) => {
     const match = line.match(STEP_LINE_PATTERN);
-    if (!match) return line; // no es una línea de step (Feature/Scenario/tags/tabla/etc.)
+    if (!match) return line; // not a step line (Feature/Scenario/tags/table/etc.)
 
     const [, indent, , stepText] = match;
     if (isStepText(stepText, compiled)) return line;
@@ -57,9 +58,10 @@ export function groundScenario(
 }
 
 /**
- * Junta los `# TODO_AI_MISSING: ...` de un feature, vengan de donde vengan: los que el propio
- * LLM escribió a propósito en el lugar correcto (siguiendo el prompt) y los que groundScenario
- * agregó como red de seguridad. Es el único canal que --implement-missing necesita mirar.
+ * Collects the `# TODO_AI_MISSING: ...` lines of a feature, wherever they came from: the
+ * ones the LLM itself wrote on purpose in the right spot (following the prompt) and the
+ * ones groundScenario added as a safety net. This is the only channel --implement-missing
+ * needs to look at.
  */
 export function extractTodoLines(featureText: string): string[] {
   const pattern = new RegExp(`^\\s*${escapeRegExp(TODO_MARKER_PREFIX)}(.+)$`, 'gm');
@@ -73,10 +75,10 @@ function escapeRegExp(text: string): string {
 const LOCATOR_CALL_PATTERN = /(?:this\.)?page\.\w+\([^()]*\)/g;
 
 /**
- * Misma idea que groundScenario, aplicada a selectores: el código generado para un Page Object
- * solo puede usar llamadas page.getBy…/page.locator(…) que aparezcan literalmente entre los
- * `suggestedLocator` del digest real del DOM (ai/domProbe.ts). Si el LLM inventa una, se rechaza
- * antes de escribir nada y sin gastar una corrida de browser.
+ * Same idea as groundScenario, applied to selectors: the code generated for a Page Object
+ * can only use page.getBy…/page.locator(…) calls that appear literally among the
+ * `suggestedLocator` values from the real DOM digest (ai/domProbe.ts). If the LLM invents
+ * one, it's rejected before writing anything and without spending a browser run.
  */
 export function groundGeneratedCode(code: string, digest: DomElementSummary[]): { ok: boolean; invalidCalls: string[] } {
   const allowed = new Set(digest.map((d) => d.suggestedLocator));

@@ -2,20 +2,21 @@ import type { Page } from '@playwright/test';
 import type { DomElementSummary } from './types';
 
 /**
- * Corre dentro del browser (Playwright serializa esta función con page.evaluate, mandando solo
- * su código fuente). No puede referenciar nada del scope de Node/TS fuera de sus parámetros.
+ * Runs inside the browser (Playwright serializes this function with page.evaluate, shipping
+ * only its source code). It can't reference anything from the Node/TS scope outside its
+ * parameters.
  *
- * tsx compila con esbuild `keepNames: true`, que envuelve toda función/const nombrada interna
- * (isVisible, labelTextFor, etc.) en un helper `__name(fn, "nombre")` para preservar `.name` en
- * stack traces. Ese helper vive en el bundle de Node, no en el string serializado que llega al
- * browser — por eso el primer statement define un polyfill identidad antes de que se lo necesite.
+ * tsx compiles with esbuild `keepNames: true`, which wraps every named inner function/const
+ * (isVisible, labelTextFor, etc.) in a `__name(fn, "name")` helper to preserve `.name` in
+ * stack traces. That helper lives in the Node bundle, not in the serialized string that
+ * reaches the browser — hence the first statement defines an identity polyfill before it's needed.
  */
 const extractCandidateElements = (): Array<Omit<DomElementSummary, 'suggestedLocator' | 'strength'>> => {
   (globalThis as unknown as { __name?: (fn: unknown, name?: string) => unknown }).__name ??= (fn) => fn;
 
-  // Interactivos (para steps que actúan) + cualquier elemento con data-test/data-testid (para
-  // steps que verifican texto — precios, nombres, etc. — que no son clickeables pero sí están
-  // instrumentados a propósito para testing, como en el resto de este repo).
+  // Interactive elements (for steps that act) + any element with data-test/data-testid (for
+  // steps that verify text — prices, names, etc. — that aren't clickable but are purposely
+  // instrumented for testing, same as the rest of this repo).
   const SELECTOR = 'button, a[href], input, select, textarea, [role], label, [data-test], [data-testid]';
   const IMPLICIT_ROLE: Record<string, string> = {
     button: 'button',
@@ -115,8 +116,8 @@ function buildSuggestedLocator(raw: Omit<DomElementSummary, 'suggestedLocator' |
       strength: 'strong',
     };
   }
-  // getByLabel solo tiene sentido para controles de formulario — un div/span con data-test
-  // (precio, nombre, etc.) puede tener accessibleName (su propio texto) sin ser "etiquetable".
+  // getByLabel only makes sense for form controls — a div/span with data-test (price, name,
+  // etc.) can have an accessibleName (its own text) without being "labelable".
   if (raw.accessibleName && ['input', 'select', 'textarea'].includes(raw.tag)) {
     return { suggestedLocator: `page.getByLabel('${escapeForSingleQuotedString(raw.accessibleName)}')`, strength: 'strong' };
   }
@@ -136,9 +137,9 @@ function buildSuggestedLocator(raw: Omit<DomElementSummary, 'suggestedLocator' |
 }
 
 /**
- * Digest del DOM real, tomado en el momento exacto del flujo donde hace falta un selector.
- * El LLM elige entre estos `suggestedLocator` ya armados (deterministas) en vez de redactar
- * el suyo — misma idea que el catálogo de steps, aplicada a selectores.
+ * Digest of the real DOM, taken at the exact moment in the flow where a selector is needed.
+ * The LLM picks among these already-built (deterministic) `suggestedLocator` values instead
+ * of writing its own — same idea as the step catalog, applied to selectors.
  */
 export async function captureCandidateElements(page: Page): Promise<DomElementSummary[]> {
   const rawElements = await page.evaluate(extractCandidateElements);
@@ -152,7 +153,7 @@ export async function captureCandidateElements(page: Page): Promise<DomElementSu
 
   return withLocators.map((el) => ({
     ...el,
-    // Si el mismo locator matchearía a más de un elemento visible, no es único: se degrada a 'weak'.
+    // If the same locator would match more than one visible element, it's not unique: downgrade to 'weak'.
     strength: (counts.get(el.suggestedLocator) ?? 1) > 1 ? 'weak' : el.strength,
   }));
 }

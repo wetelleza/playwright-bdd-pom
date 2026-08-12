@@ -16,6 +16,6 @@
     },
     "outDir": "dist"
   },
-  "include": ["pages/**/*.ts", "steps/**/*.ts", "support/**/*.ts", "ai/**/*.ts", "playwright.config.ts", ".features-gen/**/*.ts"],
+  "include": ["pages/**/*.ts", "steps/**/*.ts", "support/**/*.ts", "ai/**/*.ts", "report/**/*.ts", "playwright.config.ts", ".features-gen/**/*.ts"],
   "exclude": ["node_modules", "dist", "playwright-report", "test-results"]
 }

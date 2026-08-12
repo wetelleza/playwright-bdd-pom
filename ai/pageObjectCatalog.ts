@@ -10,8 +10,9 @@ function fixtureNameFor(className: string): string {
 }
 
 /**
- * Mismo patrón que stepCatalog.ts, aplicado a Page Objects: se usa para que el LLM elija en qué
- * página real va un método nuevo, y para que vea qué métodos ya existen y no proponga uno duplicado.
+ * Same pattern as stepCatalog.ts, applied to Page Objects: used so the LLM can pick which
+ * real page a new method belongs to, and see which methods already exist so it doesn't
+ * propose a duplicate.
  */
 export function extractPageObjectCatalog(suite: Suite, repoRoot: string = process.cwd()): PageObjectDefinition[] {
   const dir = join(repoRoot, 'pages', suite);

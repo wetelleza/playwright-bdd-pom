@@ -31,6 +31,18 @@ jobs:
       - name: Run Playwright tests
         run: npx playwright test
 
+      - name: Generate executive report
+        if: ${{ !cancelled() }}
+        run: npm run report:exec
+
+      - name: Upload executive report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: executive-report
+          path: executive-report/
+          retention-days: 14
+
       - name: Upload HTML report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

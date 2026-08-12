@@ -1,134 +1,147 @@
 # playwright-bdd-pom
 
-Proyecto base de automatización con **Playwright + TypeScript**, escritura de escenarios en **Gherkin** (BDD, vía [`playwright-bdd`](https://github.com/vitalets/playwright-bdd)) y arquitectura **Page Object Model (POM)**. Incluye pipeline de **GitHub Actions**.
+Automation base project with **Playwright + TypeScript**, scenarios written in **Gherkin** (BDD, via [`playwright-bdd`](https://github.com/vitalets/playwright-bdd)) and **Page Object Model (POM)** architecture. Includes a **GitHub Actions** pipeline.
 
-## Sitios usados como ejemplo
+## Sites used as examples
 
-| Sitio | Uso | Por qué |
+| Site | Use | Why |
 |---|---|---|
-| [demoqa.com](https://demoqa.com) | Formulario complejo (`/automation-practice-form`), tabla dinámica CRUD (`/webtables`), alertas nativas y modales (`/alerts`, `/modal-dialogs`) | Concentra widgets difíciles: date picker, autocomplete, react-select, dialogs nativos (`window.alert/confirm/prompt`), tablas React con búsqueda/paginación |
-| [saucedemo.com](https://www.saucedemo.com) | Login con distintos usuarios, carrito, checkout end-to-end | Flujo de e-commerce estable, ideal para un caso de negocio completo y para probar `data-test` attributes |
+| [demoqa.com](https://demoqa.com) | Complex form (`/automation-practice-form`), dynamic CRUD table (`/webtables`), native alerts and modals (`/alerts`, `/modal-dialogs`) | Concentrates tricky widgets: date picker, autocomplete, react-select, native dialogs (`window.alert/confirm/prompt`), React tables with search/pagination |
+| [saucedemo.com](https://www.saucedemo.com) | Login with different users, cart, end-to-end checkout | Stable e-commerce flow, ideal for a full business case and for testing `data-test` attributes |
 
-## Estructura
+## Structure
 
 ```
-features/            Escenarios Gherkin (.feature)
+features/            Gherkin scenarios (.feature)
   demoqa/
   saucedemo/
-steps/                Step definitions en TypeScript (mapean texto Gherkin -> Page Objects)
+steps/                Step definitions in TypeScript (map Gherkin text -> Page Objects)
   demoqa/
   saucedemo/
 pages/                Page Object Model
   common/BasePage.ts
   demoqa/
   saucedemo/
-support/fixtures.ts   Fixtures de Playwright que instancian los Page Objects + createBdd()
-ai/                   Generador de escenarios NL -> Gherkin con grounding anti-alucinación (ver más abajo)
-playwright.config.ts  Config de Playwright, integra playwright-bdd (defineBddConfig)
-.github/workflows/    Pipeline de CI
+support/fixtures.ts   Playwright fixtures that instantiate the Page Objects + createBdd()
+ai/                   NL -> Gherkin scenario generator with anti-hallucination grounding (see below)
+report/               Executive report for stakeholders built from Playwright's JSON output (see below)
+playwright.config.ts  Playwright config, integrates playwright-bdd (defineBddConfig)
+.github/workflows/    CI pipeline
 ```
 
-## Requisitos
+## Requirements
 
 - Node.js 20+
 
-## Instalación
+## Installation
 
 ```bash
 npm install
 npx playwright install --with-deps
 ```
 
-## Ejecutar los tests
+## Running the tests
 
 ```bash
-npm test              # genera specs desde los .feature y corre todo (chromium/firefox/webkit)
-npm run test:headed   # con navegador visible
-npm run test:ui       # modo UI interactivo de Playwright
-npm run test:demoqa   # solo escenarios @demoqa
-npm run test:saucedemo # solo escenarios @saucedemo
-npm run report        # abre el último reporte HTML
+npm test              # generates specs from the .feature files and runs everything (chromium/firefox/webkit)
+npm run test:headed   # with a visible browser
+npm run test:ui       # Playwright's interactive UI mode
+npm run test:demoqa   # only @demoqa scenarios
+npm run test:saucedemo # only @saucedemo scenarios
+npm run report        # opens the last HTML report
 ```
 
-`playwright-bdd` transforma los archivos `.feature` en specs de Playwright dentro de `.features-gen/` (carpeta generada, ignorada en git) antes de ejecutar `playwright test`.
+`playwright-bdd` transforms `.feature` files into Playwright specs inside `.features-gen/` (generated folder, ignored by git) before running `playwright test`.
 
-## Cómo se agrega un escenario nuevo
+## Executive report (`report/`)
 
-1. Escribe el `.feature` en `features/<sitio>/...feature` con los pasos en Gherkin.
-2. Si el paso es nuevo, agrégalo en `steps/<sitio>/...steps.ts`, delegando la interacción con el DOM a un Page Object (no uses selectores directamente en el step).
-3. Si el flujo necesita una página nueva, crea el Page Object en `pages/<sitio>/` extendiendo `BasePage`, y expón su fixture en `support/fixtures.ts`.
+The Playwright and Cucumber reports are built for an engineer (stack traces, selectors, traces). For someone non-technical who just needs to know "is everything OK?", there's a separate report, with none of that:
 
-## Generador de escenarios con IA (`ai/generateScenario.ts`)
+```bash
+npm test              # (or npm run test:saucedemo / test:demoqa) generates test-results/results.json
+npm run report:exec   # reads that JSON and generates executive-report/index.html
+```
 
-Convierte una descripción en español plano en un `.feature` nuevo, **reutilizando solo los steps que ya existen** en `steps/<sitio>/*.steps.ts` en vez de inventar sintaxis Gherkin sin implementar. Es el patrón de *grounding* aplicado a este proyecto: el catálogo real de steps es la única fuente de verdad, y toda línea generada se valida programáticamente antes de escribirse.
+Shows pass rate, pass rate by site (DemoQA/SauceDemo) and by browser, and — if there are failures — a plain-language list (no code, no stack traces). In CI it's generated and uploaded as an artifact on every run, even if there were failures.
+
+## How to add a new scenario
+
+1. Write the `.feature` in `features/<site>/...feature` with the steps in Gherkin.
+2. If the step is new, add it in `steps/<site>/...steps.ts`, delegating DOM interaction to a Page Object (don't use selectors directly in the step).
+3. If the flow needs a new page, create the Page Object in `pages/<site>/` extending `BasePage`, and expose its fixture in `support/fixtures.ts`.
+
+## AI scenario generator (`ai/generateScenario.ts`)
+
+Converts a plain-English description into a new `.feature`, **reusing only the steps that already exist** in `steps/<site>/*.steps.ts` instead of inventing unimplemented Gherkin syntax. It's the *grounding* pattern applied to this project: the real step catalog is the single source of truth, and every generated line is validated programmatically before being written.
 
 ### Setup
 
 ```bash
-cp .env.example .env   # completá ANTHROPIC_API_KEY (console.anthropic.com)
+cp .env.example .env   # fill in ANTHROPIC_API_KEY (console.anthropic.com)
 ```
 
-### Uso
+### Usage
 
 ```bash
-npm run ai:generate -- "Agregar dos productos distintos al carrito y verificar que el contador muestre 2" --suite saucedemo
+npm run ai:generate -- "Add two different products to the cart and verify the counter shows 2" --suite saucedemo
 ```
 
-- `--suite` es obligatorio: `demoqa` o `saucedemo`.
-- `--name <slug>` opcional, para fijar el nombre del archivo generado (por defecto se deriva de la descripción).
+- `--suite` is required: `demoqa` or `saucedemo`.
+- `--name <slug>` optional, to set the generated file's name (derived from the description by default).
 
-También se puede invocar desde el chat de Claude Code con el skill `generate-scenario` (`.claude/skills/generate-scenario/SKILL.md`), que corre este mismo comando y te resume el resultado.
+It can also be invoked from the Claude Code chat with the `generate-scenario` skill (`.claude/skills/generate-scenario/SKILL.md`), which runs this same command and summarizes the result for you.
 
-### Cómo controla la alucinación
+### How it controls hallucination
 
-1. El prompt incluye el catálogo completo de steps del sitio (extraído en vivo de `steps/<sitio>/*.steps.ts`, ver `ai/stepCatalog.ts`) y le exige a Claude reutilizar ese texto literal, rellenando solo los placeholders.
-2. Si una acción pedida no tiene step existente, el modelo no la omite en silencio ni la inventa: escribe, en el lugar exacto del Scenario donde iría, una línea `# TODO_AI_MISSING: <Keyword> <redacción propuesta>` (comentario Gherkin válido, bddgen lo ignora). Eso le da a `--implement-missing` un punto de anclaje real donde reinsertar el step si logra implementarlo.
-3. Aun así, no se confía ciegamente en la instrucción: `ai/grounding.ts#groundScenario` recompila cada patrón del catálogo con `@cucumber/cucumber-expressions` y verifica que cada línea `Given/When/Then/And/But` del resultado matchee un step real. Cualquier línea que no matchea (el modelo no siguió la regla 2) se reemplaza en el lugar por el mismo tipo de marcador `# TODO_AI_MISSING:` — mismo canal, dos orígenes: uno proactivo (el modelo) y uno de red de seguridad (verificación programática).
-4. El archivo final se escribe directo en `features/<sitio>/`, pero queda marcado con el tag `@ai-generated` y un comentario de cabecera — pensado para revisión humana antes de mergear, no para auto-aprobarse.
+1. The prompt includes the full step catalog for the site (extracted live from `steps/<site>/*.steps.ts`, see `ai/stepCatalog.ts`) and requires Claude to reuse that literal text, only filling in the placeholders.
+2. If a requested action has no existing step, the model doesn't silently drop it or invent one: it writes, in the exact spot in the Scenario where it would go, a `# TODO_AI_MISSING: <Keyword> <proposed wording>` line (a valid Gherkin comment, bddgen ignores it). That gives `--implement-missing` a real anchor point to reinsert the step if it manages to implement it.
+3. Even so, the instruction isn't blindly trusted: `ai/grounding.ts#groundScenario` recompiles every catalog pattern with `@cucumber/cucumber-expressions` and verifies that every `Given/When/Then/And/But` line in the result matches a real step. Any line that doesn't match (the model didn't follow rule 2) gets replaced in place with the same kind of `# TODO_AI_MISSING:` marker — same channel, two sources: one proactive (the model) and one as a safety net (programmatic verification).
+4. The final file is written directly into `features/<site>/`, but marked with the `@ai-generated` tag and a header comment — meant for human review before merging, not for auto-approval.
 
-### Retrieval: por qué no hay embeddings todavía
+### Retrieval: why there are no embeddings yet
 
-El catálogo actual es chico (~30 steps), así que esta versión pasa el catálogo completo al prompt en vez de hacer retrieval real. El punto de extensión natural cuando el catálogo crezca (muchos sitios/steps, catálogo que ya no entra cómodo en el contexto) es precomputar embeddings de cada step y traer solo el top-K más relevante a la descripción — eso evita prompts gigantes y la pérdida de precisión que sufren los LLMs con mucho contexto irrelevante.
+The current catalog is small (~30 steps), so this version passes the whole catalog to the prompt instead of doing real retrieval. The natural extension point when the catalog grows (many sites/steps, catalog that no longer fits comfortably in context) is to precompute embeddings for each step and bring in only the top-K most relevant to the description — that avoids giant prompts and the precision loss LLMs suffer with a lot of irrelevant context.
 
-## Implementación autónoma de lo que falta (`--implement-missing`)
+## Autonomous implementation of what's missing (`--implement-missing`)
 
-Cuando una acción pedida no tiene step existente, el generador puede ir un paso más allá de solo listarla: entrar al Page Object correspondiente, escribir el método nuevo con un selector real y el step que lo invoca, correr el escenario contra el sitio real, y si falla auto-corregirse hasta 3 intentos.
+When a requested action has no existing step, the generator can go a step further than just listing it: go into the matching Page Object, write the new method with a real selector and the step that calls it, run the scenario against the real site, and self-correct up to 3 attempts if it fails.
 
 ```bash
-npm run ai:generate -- "Aplicar un cupón de descuento en el checkout" --suite saucedemo --implement-missing
+npm run ai:generate -- "Apply a discount coupon at checkout" --suite saucedemo --implement-missing
 ```
 
-Es opt-in porque es una corrida pesada: levanta browsers reales y hace varias llamadas a Claude por step faltante.
+It's opt-in because it's a heavy run: it spins up real browsers and makes several Claude calls per missing step.
 
-**Grounding de selectores (no solo de texto):** el problema de que el LLM invente selectores sin ver el DOM real es el mismo problema de alucinación que resolvimos para los steps, aplicado un nivel más abajo. La solución es la misma idea: no dejar que el modelo redacte el selector, dárselo como catálogo real.
+**Selector grounding (not just text):** the problem of the LLM inventing selectors without seeing the real DOM is the same hallucination problem we solved for steps, one level down. The solution is the same idea: don't let the model write the selector, give it a real catalog instead.
 
-1. **Sonda (`ai/domProbe.ts` + `ai/probeRuntime.ts`)**: se inserta un método temporal en el Page Object real que, en vez de implementar la acción, captura el DOM (`page.evaluate`) y corta la ejecución. Como el escenario ya tiene steps reales *antes* del que falta (login, agregar al carrito, etc.), la sonda hereda el estado real del flujo — no hace falta calcular una navegación aparte, Playwright ya está logueado / en el carrito / donde corresponda.
-2. Para cada elemento interactivo visible, se arma de forma **determinística** (no la decide el LLM) un `suggestedLocator` con la misma prioridad que recomienda Playwright: `getByRole` → `getByLabel` → `getByPlaceholder` → `data-test` → `#id` → texto como último recurso. Si un locator matchearía a más de un elemento, se marca `weak` (no es único).
-3. Claude recibe ese catálogo de selectores reales y escribe el método **eligiendo entre esas opciones**, nunca redactando uno propio. `ai/grounding.ts#groundGeneratedCode` verifica programáticamente que cada `page.getBy…`/`page.locator(...)` del código generado aparece literalmente en el digest — si no, se rechaza antes de gastar una corrida de browser.
-4. El método (ya no la sonda) se corre de verdad contra el sitio real. Si pasa, el step deja de estar en "faltantes" y pasa a ser parte del `.feature`. Si falla, se repite desde el paso 2 con el error real como contexto adicional, hasta 3 intentos.
-5. Si se agotan los intentos, el método queda en el Page Object marcado `// AVISO IA: no se pudo verificar automáticamente...` (para no perder el intento) pero el step **no** se activa en el `.feature` — nunca se deja un escenario corriendo que no se sabe si pasa.
+1. **Probe (`ai/domProbe.ts` + `ai/probeRuntime.ts`)**: a temporary method is inserted into the real Page Object that, instead of implementing the action, captures the DOM (`page.evaluate`) and stops execution. Since the scenario already has real steps *before* the missing one (login, add to cart, etc.), the probe inherits the real state of the flow — no need to compute navigation separately, Playwright is already logged in / in the cart / wherever it needs to be.
+2. For every visible interactive element, a `suggestedLocator` is built **deterministically** (the LLM doesn't decide it) with the same priority Playwright recommends: `getByRole` → `getByLabel` → `getByPlaceholder` → `data-test` → `#id` → text as a last resort. If a locator would match more than one element, it's marked `weak` (not unique).
+3. Claude receives that catalog of real selectors and writes the method **choosing among those options**, never writing its own. `ai/grounding.ts#groundGeneratedCode` programmatically verifies that every `page.getBy…`/`page.locator(...)` in the generated code appears literally in the digest — if not, it's rejected before spending a browser run.
+4. The method (no longer the probe) is run for real against the real site. If it passes, the step stops being "missing" and becomes part of the `.feature`. If it fails, it repeats from step 2 with the real error as extra context, up to 3 attempts.
+5. If the attempts run out, the method stays in the Page Object marked `// AI WARNING: could not be verified automatically...` (so the attempt isn't lost) but the step is **not** enabled in the `.feature` — an active scenario whose outcome is unknown is never left running.
 
-Dónde queda el código nuevo:
-- El método nuevo se agrega directo dentro del Page Object real correspondiente (no en un archivo aparte), marcado con `// Generado por IA (ai:generate --implement-missing) — revisar`.
-- Los steps nuevos se agregan a `steps/<sitio>/ai-generated.steps.ts` (se crea si no existe) — es una ubicación real y activa (bddgen la toma automáticamente), separada de los archivos escritos a mano para no tocarlos con edición automática de texto.
-- Antes de proponer un método nuevo, se revisa el catálogo de Page Objects (`ai/pageObjectCatalog.ts`) para reutilizar uno existente si ya cubre la acción, en vez de duplicar.
+Where the new code ends up:
+- The new method is added directly inside the matching real Page Object (not in a separate file), marked with `// Generated by AI (ai:generate --implement-missing) — review`.
+- New steps are added to `steps/<site>/ai-generated.steps.ts` (created if it doesn't exist) — a real, active location (bddgen picks it up automatically), kept separate from hand-written files so those aren't touched by automated text editing.
+- Before proposing a new method, the Page Object catalog (`ai/pageObjectCatalog.ts`) is checked to reuse an existing one if it already covers the action, instead of duplicating.
 
-**Límite conocido:** si el step faltante es el primer step del escenario (no hay pasos previos que dejen la página en el estado correcto), la sonda no tiene forma de llegar a un estado más profundo que el `baseURL` del suite. No se resuelve con un sistema de "recetas" de navegación en esta versión.
+**Known limitation:** if the missing step is the first step of the scenario (no earlier steps leave the page in the right state), the probe has no way to reach a deeper state than the suite's `baseURL`. This isn't solved with a navigation "recipe" system in this version.
 
 ## CI (GitHub Actions)
 
-El workflow [`.github/workflows/playwright.yml`](.github/workflows/playwright.yml) corre en cada push/PR a `main`:
+The [`.github/workflows/playwright.yml`](.github/workflows/playwright.yml) workflow runs on every push/PR to `main`:
 
-1. Instala dependencias (`npm ci`).
-2. Genera los specs BDD (`npx bddgen`).
-3. Instala los navegadores de Playwright.
-4. Ejecuta los tests.
-5. Sube como artefactos el reporte HTML de Playwright y el reporte Cucumber.
+1. Installs dependencies (`npm ci`).
+2. Generates the BDD specs (`npx bddgen`).
+3. Installs Playwright's browsers.
+4. Runs the tests.
+5. Generates and uploads the executive report as an artifact, even if there were failures.
+6. Uploads the Playwright HTML report and the Cucumber report as artifacts.
 
-## Notas sobre los widgets complejos cubiertos
+## Notes on the complex widgets covered
 
-- **Date picker** (`practice-form.feature`): navegación por mes/año en vez de tipear texto libre.
-- **Autocomplete** (`subjectsInput`): escribe y selecciona de una lista de sugerencias que se renderiza dinámicamente.
-- **react-select** (State/City): no son `<select>` nativos; requieren click + click sobre la opción renderizada.
-- **Diálogos nativos** (`alerts-and-modals.feature`): `alert`, `confirm`, `prompt` se manejan como eventos (`page.on('dialog')`), no como elementos del DOM — el listener se registra antes de disparar la acción.
-- **Tabla React con CRUD** (`web-tables.feature`): alta/edición/borrado vía modal, búsqueda con filtrado dinámico de filas.
+- **Date picker** (`practice-form.feature`): navigates month/year instead of typing free text.
+- **Autocomplete** (`subjectsInput`): types and selects from a suggestion list that renders dynamically.
+- **react-select** (State/City): not native `<select>` elements; requires click + click on the rendered option.
+- **Native dialogs** (`alerts-and-modals.feature`): `alert`, `confirm`, `prompt` are handled as events (`page.on('dialog')`), not DOM elements — the listener is registered before triggering the action.
+- **React table with CRUD** (`web-tables.feature`): create/edit/delete via modal, search with dynamic row filtering.

@@ -20,9 +20,9 @@ function probeFilePath(probeId: string): string {
 }
 
 /**
- * Se llama desde un método "sonda" temporal insertado en un Page Object real: captura el DOM
- * en el punto exacto del flujo donde hace falta un selector, y corta la ejecución con un error
- * reconocible (`ProbeCaptured`) para que el orquestador lo distinga de un fallo real.
+ * Called from a temporary "probe" method inserted into a real Page Object: captures the DOM
+ * at the exact point in the flow where a selector is needed, and stops execution with a
+ * recognizable error (`ProbeCaptured`) so the orchestrator can tell it apart from a real failure.
  */
 export async function captureProbe(page: Page, probeId: string): Promise<never> {
   const digest = await captureCandidateElements(page);
