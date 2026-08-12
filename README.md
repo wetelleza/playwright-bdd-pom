@@ -15,18 +15,23 @@ Automation base project with **Playwright + TypeScript**, scenarios written in *
 features/            Gherkin scenarios (.feature)
   demoqa/
   saucedemo/
-steps/                Step definitions in TypeScript (map Gherkin text -> Page Objects)
+  api/
+steps/                Step definitions in TypeScript (map Gherkin text -> Page Objects/API client)
   demoqa/
   saucedemo/
-pages/                Page Object Model
+  api/
+pages/                Page Object Model (UI)
   common/BasePage.ts
   demoqa/
   saucedemo/
-support/fixtures.ts   Playwright fixtures that instantiate the Page Objects + createBdd()
+clients/ApiClient.ts  The API-testing equivalent of a Page Object (wraps APIRequestContext)
+support/fixtures.ts   Playwright fixtures that instantiate the Page Objects/API client + createBdd()
+api-server/           Small Express + TypeScript backend used as a real target for the API tests (see below)
 ai/                   NL -> Gherkin scenario generator with anti-hallucination grounding (see below)
 report/               Executive report for stakeholders built from Playwright's JSON output (see below)
 playwright.config.ts  Playwright config, integrates playwright-bdd (defineBddConfig)
-.github/workflows/    CI pipeline
+Dockerfile            Test runner image; api-server/Dockerfile + docker-compose.yml (see below)
+.github/workflows/    CI pipeline (runs the suite via Docker)
 ```
 
 ## Requirements
@@ -43,15 +48,16 @@ npx playwright install --with-deps
 ## Running the tests
 
 ```bash
-npm test              # generates specs from the .feature files and runs everything (chromium/firefox/webkit)
+npm test              # generates specs from the .feature files and runs everything (chromium/firefox/webkit + api)
 npm run test:headed   # with a visible browser
 npm run test:ui       # Playwright's interactive UI mode
 npm run test:demoqa   # only @demoqa scenarios
 npm run test:saucedemo # only @saucedemo scenarios
+npm run test:api      # only the API suite (needs api-server running, see below)
 npm run report        # opens the last HTML report
 ```
 
-`playwright-bdd` transforms `.feature` files into Playwright specs inside `.features-gen/` (generated folder, ignored by git) before running `playwright test`.
+`playwright-bdd` transforms `.feature` files into Playwright specs inside `.features-gen/` (generated folder, ignored by git) before running `playwright test`. API specs get their own Playwright project (`api`, no browser) so they don't run needlessly 3 times across chromium/firefox/webkit.
 
 ## Executive report (`report/`)
 
@@ -62,13 +68,49 @@ npm test              # (or npm run test:saucedemo / test:demoqa) generates test
 npm run report:exec   # reads that JSON and generates executive-report/index.html
 ```
 
-Shows pass rate, pass rate by site (DemoQA/SauceDemo) and by browser, and — if there are failures — a plain-language list (no code, no stack traces). In CI it's generated and uploaded as an artifact on every run, even if there were failures.
+Shows pass rate, pass rate by area (DemoQA/SauceDemo/API) and by browser, and — if there are failures — a plain-language list (no code, no stack traces). In CI it's generated and uploaded as an artifact on every run, even if there were failures.
 
 ## How to add a new scenario
 
 1. Write the `.feature` in `features/<site>/...feature` with the steps in Gherkin.
 2. If the step is new, add it in `steps/<site>/...steps.ts`, delegating DOM interaction to a Page Object (don't use selectors directly in the step).
 3. If the flow needs a new page, create the Page Object in `pages/<site>/` extending `BasePage`, and expose its fixture in `support/fixtures.ts`.
+
+## API tests (`api-server/`, `clients/ApiClient.ts`)
+
+The project only had UI tests until now. Rather than point API tests at a third-party API, there's a **small Express + TypeScript backend living in this repo** (`api-server/`) — free forever (no cloud dependency), and it can grow (more endpoints/services) in ways a third-party API wouldn't allow.
+
+It exposes an in-memory `tasks` resource behind a login:
+
+- `POST /auth/login` — hardcoded demo credentials (`admin` / `admin123`), returns a bearer token or 401.
+- `GET/POST /tasks`, `GET/PUT/DELETE /tasks/:id` — all require `Authorization: Bearer <token>` (401 if missing/invalid), 400 on a missing required field, 404 on an unknown id.
+
+The store resets whenever the process restarts — that's fine for a test target, and it's the extension point for a real DB (SQLite/Postgres) later without the routes changing shape.
+
+### Running it locally (without Docker)
+
+```bash
+npm run api:install   # once, installs api-server's own dependencies
+npm run api:dev       # starts it on http://localhost:3001
+npm run test:api      # in another terminal
+```
+
+### How the tests are structured
+
+`clients/ApiClient.ts` wraps Playwright's `APIRequestContext` — the API-testing equivalent of a Page Object, so `steps/api/tasks.steps.ts` reads as short sentences instead of raw `request.*` calls. The `apiClient` fixture (`support/fixtures.ts`) builds its own `APIRequestContext` pointed at `API_BASE_URL` (default `http://localhost:3001`), independent from the UI suite's `baseURL` (demoqa.com). `features/api/tasks.feature` covers the full CRUD happy path plus the classic negative matrix (401 without a token, 400 on a missing title, 404 on an unknown id).
+
+## Docker
+
+```bash
+npm run docker:build   # docker compose build
+npm run docker:test    # docker compose run --rm tests (starts api-server too, runs the full suite)
+```
+
+Two images:
+- **`Dockerfile`** (root) — the test runner, based on the official `mcr.microsoft.com/playwright` image (pinned to match the installed `@playwright/test` version — bump both together when upgrading).
+- **`api-server/Dockerfile`** — lightweight `node:20-alpine`, no browsers, just Express + tsx.
+
+`docker-compose.yml` wires them together: the `tests` service waits for `api` to report healthy, reaches it at `http://api:3001` over the compose network, and writes reports back to the host via volumes (`playwright-report/`, `cucumber-report/`, `executive-report/`, `test-results/`) so they're inspectable without going into the container.
 
 ## AI scenario generator (`ai/generateScenario.ts`)
 
@@ -131,11 +173,11 @@ Where the new code ends up:
 
 The [`.github/workflows/playwright.yml`](.github/workflows/playwright.yml) workflow runs on every push/PR to `main`:
 
-1. Installs dependencies (`npm ci`).
-2. Generates the BDD specs (`npx bddgen`).
-3. Installs Playwright's browsers.
-4. Runs the tests.
-5. Generates and uploads the executive report as an artifact, even if there were failures.
+1. Installs dependencies (`npm ci`) — needed on the runner for the report-generation step below, which doesn't need a browser so it doesn't need to run inside a container.
+2. Builds the Docker images (`docker compose build`).
+3. Runs the whole suite — chromium/firefox/webkit + api — inside containers (`docker compose run --rm tests`), which starts `api-server` automatically. Same environment on every machine; sidesteps host-specific issues entirely (this is the generalized fix for a couple of Windows-only bugs hit during local development: an `npx`/`spawnSync` quirk and a missing system DLL for Webkit).
+4. Stops the containers.
+5. Generates and uploads the executive report as an artifact, even if there were failures (reports land on the host via the volumes in `docker-compose.yml`).
 6. Uploads the Playwright HTML report and the Cucumber report as artifacts.
 
 ## Notes on the complex widgets covered
@@ -145,3 +187,6 @@ The [`.github/workflows/playwright.yml`](.github/workflows/playwright.yml) workf
 - **react-select** (State/City): not native `<select>` elements; requires click + click on the rendered option.
 - **Native dialogs** (`alerts-and-modals.feature`): `alert`, `confirm`, `prompt` are handled as events (`page.on('dialog')`), not DOM elements — the listener is registered before triggering the action.
 - **React table with CRUD** (`web-tables.feature`): create/edit/delete via modal, search with dynamic row filtering.
+- **File upload/download** (`upload-download.feature`): upload via a native `<input type="file">` (in-memory buffer, no fixture file needed on disk); download from an anchor whose `href` is a `data:` URI, not a real URL — Playwright still intercepts it as a normal `download` event.
+- **Native form validation** (`practice-form.feature`, required-field/email scenarios): the site relies on the browser's own HTML5 constraint validation (`required`/`pattern` attributes), not a custom CSS class — a failing field matches the `:invalid` pseudo-class, checked via `locator.evaluate(el => el.matches(':invalid'))`.
+- **Hierarchical checkbox tree** (`checkboxes.feature`): built with `rc-tree` — selecting a parent node's checkbox cascades the selection to every descendant, even ones never expanded/rendered in the DOM.

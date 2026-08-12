@@ -43,7 +43,12 @@ export function computeSummary(results: FlatResult[], totalDurationMs: number): 
       results.filter((r) => r.suite !== 'other'),
       (r) => r.suite,
     ),
-    byBrowser: groupBy(results, (r) => r.project),
+    // The "api" project isn't a browser (API tests don't touch one) — excluded here so it
+    // doesn't show up as a fake browser row; it already gets its own row in bySuite.
+    byBrowser: groupBy(
+      results.filter((r) => r.suite !== 'api'),
+      (r) => r.project,
+    ),
     failures: results.filter((r) => r.status === 'failed' || r.status === 'flaky'),
   };
 }

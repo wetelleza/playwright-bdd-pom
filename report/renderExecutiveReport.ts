@@ -15,7 +15,7 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-const SUITE_LABELS: Record<string, string> = { demoqa: 'DemoQA', saucedemo: 'SauceDemo' };
+const SUITE_LABELS: Record<string, string> = { demoqa: 'DemoQA', saucedemo: 'SauceDemo', api: 'API' };
 
 function statTile(label: string, value: string, variant: 'default' | 'good' | 'critical' = 'default'): string {
   return `
@@ -255,7 +255,7 @@ export function renderExecutiveReport(summary: ExecutiveSummary): string {
     </div>
 
     ${compositionBar(summary)}
-    ${groupBarChart('Pass rate by site', summary.bySuite, SUITE_LABELS)}
+    ${groupBarChart('Pass rate by area', summary.bySuite, SUITE_LABELS)}
     ${groupBarChart('Pass rate by browser', summary.byBrowser)}
     ${failuresSection(summary)}
 

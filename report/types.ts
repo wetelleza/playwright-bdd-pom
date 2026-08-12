@@ -4,7 +4,7 @@ export interface FlatResult {
   title: string;
   file: string;
   project: string;
-  suite: 'demoqa' | 'saucedemo' | 'other';
+  suite: 'demoqa' | 'saucedemo' | 'api' | 'other';
   status: TestStatus;
   durationMs: number;
   errorMessage: string | null;

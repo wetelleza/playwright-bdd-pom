@@ -39,6 +39,7 @@ const OUTCOME_TO_STATUS: Record<string, TestStatus> = {
 function detectSuite(tags: string[]): FlatResult['suite'] {
   if (tags.includes('demoqa')) return 'demoqa';
   if (tags.includes('saucedemo')) return 'saucedemo';
+  if (tags.includes('api')) return 'api';
   return 'other';
 }
 

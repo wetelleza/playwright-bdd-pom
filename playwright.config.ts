@@ -27,17 +27,26 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
+    // API specs don't touch a browser at all, so they're excluded from the 3 browser
+    // projects (no point running them 3x) and get their own project below instead.
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /features[\\/]api[\\/]/,
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
+      testIgnore: /features[\\/]api[\\/]/,
     },
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
+      testIgnore: /features[\\/]api[\\/]/,
+    },
+    {
+      name: 'api',
+      testMatch: /features[\\/]api[\\/]/,
     },
   ],
 });

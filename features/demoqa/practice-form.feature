@@ -22,3 +22,16 @@ Feature: DemoQA practice form
     Then the confirmation modal is shown
     And the modal shows "Student Name" with value "Ada Lovelace"
     And the modal shows "Student Email" with value "ada@example.com"
+
+  Scenario: Required fields are flagged when the form is submitted empty
+    When submits the form
+    Then the "firstName" field is marked invalid
+    And the "lastName" field is marked invalid
+    And the "mobile" field is marked invalid
+
+  Scenario: An invalid email format is flagged
+    When the user fills in their personal details
+      | firstName | lastName | email        | mobile     |
+      | Ada       | Lovelace | not-an-email | 5551234567 |
+    And submits the form
+    Then the "email" field is marked invalid

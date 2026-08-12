@@ -9,10 +9,15 @@
     "test:ui": "npx bddgen && playwright test --ui",
     "test:demoqa": "npx bddgen && playwright test --grep @demoqa",
     "test:saucedemo": "npx bddgen && playwright test --grep @saucedemo",
+    "test:api": "npx bddgen && playwright test --project=api",
     "report": "playwright show-report",
     "report:exec": "tsx report/generateExecutiveReport.ts",
     "codegen": "playwright codegen",
-    "ai:generate": "tsx ai/generateScenario.ts"
+    "ai:generate": "tsx ai/generateScenario.ts",
+    "api:install": "npm install --prefix api-server",
+    "api:dev": "tsx api-server/src/index.ts",
+    "docker:build": "docker compose build",
+    "docker:test": "docker compose run --rm tests"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.32.0",

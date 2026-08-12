@@ -18,3 +18,13 @@ Feature: SauceDemo login
     Given the user is on the SauceDemo login page
     When logs in with user "invalid_user" and password "invalid_password"
     Then the error "Epic sadface: Username and password do not match any user in this service" is shown
+
+  Scenario: Login with a user that has broken images
+    Given the user is on the SauceDemo login page
+    When logs in with user "problem_user" and password "secret_sauce"
+    Then the user lands on the products list
+
+  Scenario: Login with a user that has a performance glitch
+    Given the user is on the SauceDemo login page
+    When logs in with user "performance_glitch_user" and password "secret_sauce"
+    Then the user lands on the products list

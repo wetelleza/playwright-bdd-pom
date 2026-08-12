@@ -16,6 +16,7 @@ export class CheckoutPage extends BasePage {
   private readonly finishButton: Locator;
   private readonly summaryTotal: Locator;
   private readonly completeHeader: Locator;
+  private readonly errorMessage: Locator;
 
   constructor(page: Page) {
     super(page);
@@ -27,6 +28,7 @@ export class CheckoutPage extends BasePage {
     this.finishButton = page.locator('[data-test="finish"]');
     this.summaryTotal = page.locator('.summary_total_label');
     this.completeHeader = page.locator('.complete-header');
+    this.errorMessage = page.locator('[data-test="error"]');
   }
 
   async startCheckout(): Promise<void> {
@@ -50,5 +52,9 @@ export class CheckoutPage extends BasePage {
 
   async isOrderComplete(): Promise<boolean> {
     return this.completeHeader.isVisible();
+  }
+
+  async errorText(): Promise<string | null> {
+    return this.errorMessage.textContent();
   }
 }

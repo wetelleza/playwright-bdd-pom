@@ -1,0 +1,26 @@
+services:
+  api:
+    build: ./api-server
+    ports:
+      - '3001:3001'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3001/health']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  tests:
+    build: .
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: http://api:3001
+      # Only needed for `npm run ai:generate` — safe to leave unset for a normal test run.
+      # Compose reads it from a local .env file if present, or falls back to the shell env.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./cucumber-report:/app/cucumber-report
+      - ./executive-report:/app/executive-report
+      - ./test-results:/app/test-results

@@ -1,0 +1,10 @@
+node_modules
+api-server
+.git
+.env
+.features-gen
+playwright-report
+cucumber-report
+executive-report
+test-results
+ai/.probe

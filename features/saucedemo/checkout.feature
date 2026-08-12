@@ -27,3 +27,8 @@ Feature: SauceDemo checkout flow
     Then the cart counter shows "1"
     When removes "Sauce Labs Bike Light" from the cart
     Then the cart counter shows "0"
+
+  Scenario: Checkout requires a first name
+    When goes to the cart and proceeds to checkout
+    And fills in shipping details "" "Doe" "10001"
+    Then the shipping error "Error: First Name is required" is shown

@@ -22,14 +22,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate specs from Gherkin features
-        run: npx bddgen
+      - name: Build Docker images
+        run: docker compose build
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+      # Runs the whole suite (chromium/firefox/webkit + api) inside containers — same
+      # environment on every machine, sidesteps host-specific quirks entirely. `tests` depends
+      # on `api` being healthy, so compose starts it automatically. Reports land on the host via
+      # the volumes in docker-compose.yml.
+      - name: Run test suite in Docker
+        run: docker compose run --rm tests
 
-      - name: Run Playwright tests
-        run: npx playwright test
+      - name: Stop containers
+        if: ${{ !cancelled() }}
+        run: docker compose down
 
       - name: Generate executive report
         if: ${{ !cancelled() }}

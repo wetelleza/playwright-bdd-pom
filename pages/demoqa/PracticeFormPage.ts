@@ -121,4 +121,16 @@ export class PracticeFormPage extends BasePage {
     const cells = row.locator('td');
     return cells.nth(1).textContent();
   }
+
+  /** The form relies on native HTML5 constraint validation (required/pattern) — a failing
+   *  field matches the `:invalid` CSS pseudo-class, not a custom class the site adds via JS. */
+  async hasValidationError(field: 'firstName' | 'lastName' | 'email' | 'mobile'): Promise<boolean> {
+    const locators: Record<typeof field, Locator> = {
+      firstName: this.firstName,
+      lastName: this.lastName,
+      email: this.email,
+      mobile: this.mobile,
+    };
+    return locators[field].evaluate((el) => (el as HTMLInputElement).matches(':invalid'));
+  }
 }

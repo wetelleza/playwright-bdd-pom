@@ -55,3 +55,7 @@ Then('the modal shows {string} with value {string}', async ({ practiceFormPage }
   const actual = await practiceFormPage.getModalRowValue(label);
   expect(actual).toBe(value);
 });
+
+Then('the {string} field is marked invalid', async ({ practiceFormPage }, field: string) => {
+  expect(await practiceFormPage.hasValidationError(field as 'firstName' | 'lastName' | 'email' | 'mobile')).toBe(true);
+});

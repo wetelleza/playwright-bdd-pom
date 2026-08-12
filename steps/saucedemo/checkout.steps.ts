@@ -39,6 +39,10 @@ Then('the order completes successfully', async ({ checkoutPage }) => {
   expect(await checkoutPage.isOrderComplete()).toBe(true);
 });
 
+Then('the shipping error {string} is shown', async ({ checkoutPage }, expected: string) => {
+  await expect.poll(() => checkoutPage.errorText()).toContain(expected);
+});
+
 When('sorts the products by {string}', async ({ inventoryPage }, option: string) => {
   const map: Record<string, 'az' | 'za' | 'lohi' | 'hilo'> = {
     'Name (A to Z)': 'az',
