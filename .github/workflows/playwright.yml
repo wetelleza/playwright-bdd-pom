@@ -22,6 +22,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # If these don't exist yet, Docker Compose creates them as part of setting up the bind
+      # mounts in docker-compose.yml — owned by root, since the container runs as root. That
+      # leaves the runner user unable to write the executive report afterward. Pre-creating them
+      # here (as the runner user) means Compose just reuses the existing, runner-owned folders.
+      - name: Prepare report directories
+        run: mkdir -p playwright-report cucumber-report executive-report test-results
+
       - name: Build Docker images
         run: docker compose build
 
