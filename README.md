@@ -29,9 +29,10 @@ support/fixtures.ts   Playwright fixtures that instantiate the Page Objects/API 
 api-server/           Small Express + TypeScript backend used as a real target for the API tests (see below)
 ai/                   NL -> Gherkin scenario generator with anti-hallucination grounding (see below)
 report/               Executive report for stakeholders built from Playwright's JSON output (see below)
+infra/                CDK app: the generator exposed as a Lambda + API Gateway endpoint (see below)
 playwright.config.ts  Playwright config, integrates playwright-bdd (defineBddConfig)
 Dockerfile            Test runner image; api-server/Dockerfile + docker-compose.yml (see below)
-.github/workflows/    CI pipeline (runs the suite via Docker)
+.github/workflows/    CI pipeline (Docker) + Lambda deploy pipeline (OIDC)
 ```
 
 ## Requirements
@@ -168,6 +169,57 @@ Where the new code ends up:
 - Before proposing a new method, the Page Object catalog (`ai/pageObjectCatalog.ts`) is checked to reuse an existing one if it already covers the action, instead of duplicating.
 
 **Known limitation:** if the missing step is the first step of the scenario (no earlier steps leave the page in the right state), the probe has no way to reach a deeper state than the suite's `baseURL`. This isn't solved with a navigation "recipe" system in this version.
+
+## Lambda + API Gateway (`infra/`)
+
+The plain generator (no `--implement-missing`) is also deployed as a serverless AI microservice — the concrete "cloud-native AI application" piece: `POST /generate` with `{ "description": "...", "suite": "demoqa" | "saucedemo" }` returns `{ "featureText": "...", "missingSteps": [...] }`. Same anti-hallucination grounding as the CLI, no filesystem writes — `ai/generateScenarioCore.ts` holds the shared logic so it isn't duplicated between the CLI and the Lambda handler.
+
+**Why `--implement-missing` stays out of Lambda:** it needs a real, multi-minute browser session — the wrong execution model for a request/response function. It keeps living exactly where it already does (CLI / CI / Docker).
+
+### Architecture
+
+- **IaC**: AWS CDK in TypeScript (`infra/lib/generate-scenario-stack.ts`) — a Lambda function (Node 20) behind a REST API Gateway, `POST /generate` requiring an API key, plus a usage plan (rate limit, burst limit, monthly quota).
+- **Build** (`infra/build.mjs`): esbuild-bundles `infra/lambda/handler.ts` into `infra/dist/handler.js`, and copies `steps/` and `features/` into `infra/dist/` — `ai/stepCatalog.ts` reads those as real files at runtime (same live-catalog mechanism as everywhere else in this project), they just need to physically exist in the deployed package.
+- **Deploy**: GitHub Actions (`.github/workflows/deploy-lambda.yml`), authenticating to AWS via **OIDC** (no long-lived AWS keys stored in GitHub) — same pattern as the Docker CI pipeline, applied to a cloud deploy this time. Every deploy ends with a smoke test: a real `curl` against the live endpoint, asserting `200`.
+
+### Local build (no AWS needed)
+
+```bash
+cd infra
+npm install
+npm run synth   # builds the bundle, then `cdk synth` — validates the whole stack, no AWS credentials required
+```
+
+### One-time AWS setup (only needed once, done by whoever owns the AWS account)
+
+1. Create the GitHub OIDC identity provider in IAM (skip if one already exists from another project):
+   ```bash
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com \
+     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+   ```
+2. Create an IAM role trusting that provider, scoped to this repo's `main` branch only, and attach a policy broad enough for CDK to manage its own resources (`AdministratorAccess` is the pragmatic choice for a personal/demo account — the trust policy below, not the permissions, is what actually limits who can assume it):
+   ```bash
+   cat > trust-policy.json <<'JSON'
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Effect": "Allow",
+       "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
+       "Action": "sts:AssumeRoleWithWebIdentity",
+       "Condition": {
+         "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+         "StringLike": { "token.actions.githubusercontent.com:sub": "repo:wetelleza/playwright-bdd-pom:ref:refs/heads/main" }
+       }
+     }]
+   }
+   JSON
+   aws iam create-role --role-name github-deploy-playwright-bdd-pom --assume-role-policy-document file://trust-policy.json
+   aws iam attach-role-policy --role-name github-deploy-playwright-bdd-pom --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+   ```
+3. Add two repository secrets (Settings → Secrets and variables → Actions): `AWS_DEPLOY_ROLE_ARN` (the role's ARN from step 2) and `ANTHROPIC_API_KEY` (the same Claude key already used locally).
+4. Push to `main` (touching `infra/**` or `ai/**`), or run the workflow manually — it builds, deploys, and smoke-tests the live endpoint.
 
 ## CI (GitHub Actions)
 

@@ -1,0 +1,70 @@
+name: Deploy Lambda
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - 'ai/**'
+      - '.github/workflows/deploy-lambda.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # required for OIDC — no long-lived AWS keys stored in GitHub
+  contents: read
+
+jobs:
+  deploy:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install infra dependencies
+        run: npm ci
+        working-directory: infra
+
+      - name: Build Lambda bundle
+        run: npm run build
+        working-directory: infra
+
+      # Idempotent — safe to run on every deploy instead of requiring a separate manual step.
+      - name: CDK bootstrap
+        run: npx cdk bootstrap
+        working-directory: infra
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: CDK deploy
+        run: npx cdk deploy --require-approval never --outputs-file outputs.json
+        working-directory: infra
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      # Same "verify against the real thing" discipline as the rest of this project — proves the
+      # deployed endpoint actually answers, not just that `cdk deploy` returned success.
+      - name: Smoke test the deployed endpoint
+        working-directory: infra
+        run: |
+          API_URL=$(node -p "require('./outputs.json').GenerateScenarioStack.ApiUrl")
+          API_KEY_ID=$(node -p "require('./outputs.json').GenerateScenarioStack.ApiKeyId")
+          API_KEY_VALUE=$(aws apigateway get-api-key --api-key "$API_KEY_ID" --include-value --query value --output text)
+
+          echo "Calling $API_URL"
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST "$API_URL" \
+            -H "x-api-key: $API_KEY_VALUE" \
+            -H "Content-Type: application/json" \
+            -d '{"description":"Verify the page title is visible","suite":"demoqa"}')
+
+          echo "HTTP status: $STATUS"
+          cat /tmp/response.json
+          test "$STATUS" -eq 200

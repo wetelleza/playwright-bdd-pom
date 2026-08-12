@@ -1,0 +1,23 @@
+{
+  "name": "infra",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CDK app: Lambda + API Gateway exposing the NL -> Gherkin generator as a serverless endpoint.",
+  "scripts": {
+    "build": "node build.mjs",
+    "synth": "npm run build && npx cdk synth",
+    "deploy": "npm run build && npx cdk deploy"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.264.0",
+    "constructs": "^10.8.1"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1136.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/aws-lambda": "^8.10.162",
+    "@types/node": "^22.7.0"
+  }
+}

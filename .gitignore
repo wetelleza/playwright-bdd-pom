@@ -10,3 +10,5 @@ playwright/.cache/
 *.log
 ai/.probe/
 executive-report/
+cdk.out/
+infra/outputs.json

@@ -1,0 +1,7 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "watch": {
+    "include": ["**/*.ts"],
+    "exclude": ["node_modules/**", "cdk.out/**", "dist/**"]
+  }
+}
