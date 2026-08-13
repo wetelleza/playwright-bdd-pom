@@ -43,6 +43,12 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
+      # ai/ is a sibling of infra/, not a descendant — Node module resolution for its imports
+      # (e.g. ai/grounding.ts's @cucumber/cucumber-expressions) walks up from ai/ itself, not from
+      # infra/, so it needs the repo root's own node_modules, matching local dev.
+      - name: Install root dependencies
+        run: npm ci
+
       - name: Install infra dependencies
         run: npm ci
         working-directory: infra
