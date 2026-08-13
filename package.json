@@ -10,6 +10,7 @@
     "test:demoqa": "npx bddgen && playwright test --grep @demoqa",
     "test:saucedemo": "npx bddgen && playwright test --grep @saucedemo",
     "test:api": "npx bddgen && playwright test --project=api",
+    "test:lambda": "npx bddgen && playwright test --project=api --grep @lambda",
     "report": "playwright show-report",
     "report:exec": "tsx report/generateExecutiveReport.ts",
     "codegen": "playwright codegen",

@@ -8,6 +8,7 @@ import { CheckoutPage } from '../pages/saucedemo/CheckoutPage';
 import { UploadDownloadPage } from '../pages/demoqa/UploadDownloadPage';
 import { CheckboxPage } from '../pages/demoqa/CheckboxPage';
 import { ApiClient } from '../clients/ApiClient';
+import { LambdaClient } from '../clients/LambdaClient';
 
 interface PageObjectFixtures {
   practiceFormPage: PracticeFormPage;
@@ -19,6 +20,7 @@ interface PageObjectFixtures {
   uploadDownloadPage: UploadDownloadPage;
   checkboxPage: CheckboxPage;
   apiClient: ApiClient;
+  lambdaClient: LambdaClient;
 }
 
 /** Each fixture instantiates its Page Object on demand: steps only ask for what they use. */
@@ -36,6 +38,13 @@ export const test = base.extend<PageObjectFixtures>({
   apiClient: async ({ playwright }, use) => {
     const context = await playwright.request.newContext({ baseURL: process.env.API_BASE_URL ?? 'http://localhost:3001' });
     await use(new ApiClient(context));
+    await context.dispose();
+  },
+  // Points at the deployed API Gateway stage (infra/), not the local tasks backend — set
+  // LAMBDA_API_URL/LAMBDA_API_KEY from `cdk deploy`'s outputs (see the deploy workflow).
+  lambdaClient: async ({ playwright }, use) => {
+    const context = await playwright.request.newContext({ baseURL: process.env.LAMBDA_API_URL ?? 'http://localhost:3000/' });
+    await use(new LambdaClient(context, process.env.LAMBDA_API_KEY ?? ''));
     await context.dispose();
   },
 });

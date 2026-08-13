@@ -172,15 +172,24 @@ Where the new code ends up:
 
 ## Lambda + API Gateway (`infra/`)
 
-The plain generator (no `--implement-missing`) is also deployed as a serverless AI microservice — the concrete "cloud-native AI application" piece: `POST /generate` with `{ "description": "...", "suite": "demoqa" | "saucedemo" }` returns `{ "featureText": "...", "missingSteps": [...] }`. Same anti-hallucination grounding as the CLI, no filesystem writes — `ai/generateScenarioCore.ts` holds the shared logic so it isn't duplicated between the CLI and the Lambda handler.
+The plain generator (no `--implement-missing`) is also deployed as a serverless AI microservice — the concrete "cloud-native AI application" piece:
+
+- `POST /generate` with `{ "description": "...", "suite": "demoqa" | "saucedemo" }` returns `{ "featureText": "...", "missingSteps": [...] }`. Same anti-hallucination grounding as the CLI, no filesystem writes — `ai/generateScenarioCore.ts` holds the shared logic so it isn't duplicated between the CLI and the Lambda handler.
+- `GET /catalog?suite=demoqa|saucedemo` returns `{ "suite": "...", "steps": [{ "keyword", "pattern", "sourceFile" }, ...] }` — the same live step catalog `/generate` grounds against (`ai/stepCatalog.ts`), so a client can inspect what already exists before asking for a new scenario. Read-only, no Claude call, so it's fast and free to call.
 
 **Why `--implement-missing` stays out of Lambda:** it needs a real, multi-minute browser session — the wrong execution model for a request/response function. It keeps living exactly where it already does (CLI / CI / Docker).
 
 ### Architecture
 
-- **IaC**: AWS CDK in TypeScript (`infra/lib/generate-scenario-stack.ts`) — a Lambda function (Node 20) behind a REST API Gateway, `POST /generate` requiring an API key, plus a usage plan (rate limit, burst limit, monthly quota).
+- **IaC**: AWS CDK in TypeScript (`infra/lib/generate-scenario-stack.ts`) — a Lambda function (Node 20) behind a REST API Gateway, `POST /generate` and `GET /catalog` both requiring an API key, plus a usage plan (rate limit, burst limit, monthly quota) shared across both.
 - **Build** (`infra/build.mjs`): esbuild-bundles `infra/lambda/handler.ts` into `infra/dist/handler.js`, and copies `steps/` and `features/` into `infra/dist/` — `ai/stepCatalog.ts` reads those as real files at runtime (same live-catalog mechanism as everywhere else in this project), they just need to physically exist in the deployed package.
-- **Deploy**: GitHub Actions (`.github/workflows/deploy-lambda.yml`), authenticating to AWS via **OIDC** (no long-lived AWS keys stored in GitHub) — same pattern as the Docker CI pipeline, applied to a cloud deploy this time. Every deploy ends with a smoke test: a real `curl` against the live endpoint, asserting `200`.
+- **Deploy**: GitHub Actions (`.github/workflows/deploy-lambda.yml`), authenticating to AWS via **OIDC** (no long-lived AWS keys stored in GitHub) — same pattern as the Docker CI pipeline, applied to a cloud deploy this time.
+- **Testing the live endpoint**: every deploy ends by running a real Playwright/Gherkin suite (`features/api/lambda-generate.feature`, tagged `@lambda`) against the just-deployed URL — happy path, input validation (missing description, invalid suite), and the API-key rejection path (403 from API Gateway itself). Same tooling as the rest of the project's tests, via a `LambdaClient` (`clients/LambdaClient.ts`) that mirrors the existing `ApiClient` pattern used for `api-server/`. Run it yourself against a live deployment with:
+  ```bash
+  LAMBDA_API_URL=https://<id>.execute-api.us-east-1.amazonaws.com/prod/ \
+  LAMBDA_API_KEY=<key value> \
+  npm run test:lambda
+  ```
 
 ### Local build (no AWS needed)
 

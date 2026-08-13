@@ -6,8 +6,9 @@ import * as path from 'node:path';
 
 /**
  * Serverless AI microservice: exposes the NL -> Gherkin generator (ai/generateScenarioCore.ts)
- * over HTTP. `--implement-missing` deliberately stays out of Lambda's reach — it needs a real,
- * multi-minute browser session, the wrong execution model here.
+ * as POST /generate, plus a read-only GET /catalog for inspecting the live step catalog it
+ * grounds against. `--implement-missing` deliberately stays out of Lambda's reach — it needs a
+ * real, multi-minute browser session, the wrong execution model here.
  */
 export class GenerateScenarioStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -38,6 +39,9 @@ export class GenerateScenarioStack extends cdk.Stack {
     const generate = api.root.addResource('generate');
     generate.addMethod('POST', new apigateway.LambdaIntegration(fn), { apiKeyRequired: true });
 
+    const catalog = api.root.addResource('catalog');
+    catalog.addMethod('GET', new apigateway.LambdaIntegration(fn), { apiKeyRequired: true });
+
     const apiKey = api.addApiKey('GenerateScenarioApiKey');
     const usagePlan = api.addUsagePlan('GenerateScenarioUsagePlan', {
       name: 'default',
@@ -47,7 +51,9 @@ export class GenerateScenarioStack extends cdk.Stack {
     usagePlan.addApiStage({ stage: api.deploymentStage });
     usagePlan.addApiKey(apiKey);
 
-    new cdk.CfnOutput(this, 'ApiUrl', { value: api.urlForPath('/generate') });
+    // Base stage URL (e.g. https://xxxx.execute-api.us-east-1.amazonaws.com/prod/) — callers
+    // append `generate` or `catalog`.
+    new cdk.CfnOutput(this, 'ApiBaseUrl', { value: api.url });
     // The key's actual value isn't retrievable from a CFN output — resolve it at deploy time via
     // `aws apigateway get-api-key --api-key <ApiKeyId> --include-value` (see the deploy workflow).
     new cdk.CfnOutput(this, 'ApiKeyId', { value: apiKey.keyId });

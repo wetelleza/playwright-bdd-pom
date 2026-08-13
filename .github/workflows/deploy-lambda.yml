@@ -57,20 +57,15 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       # Same "verify against the real thing" discipline as the rest of this project — proves the
-      # deployed endpoint actually answers, not just that `cdk deploy` returned success.
-      - name: Smoke test the deployed endpoint
-        working-directory: infra
+      # deployed endpoint actually answers (happy path, validation, auth), not just that
+      # `cdk deploy` returned success. Runs at repo root: features/, steps/ and playwright.config.ts
+      # all live there, not under infra/.
+      - name: Test the deployed endpoint
         run: |
-          API_URL=$(node -p "require('./outputs.json').GenerateScenarioStack.ApiUrl")
-          API_KEY_ID=$(node -p "require('./outputs.json').GenerateScenarioStack.ApiKeyId")
-          API_KEY_VALUE=$(aws apigateway get-api-key --api-key "$API_KEY_ID" --include-value --query value --output text)
+          export LAMBDA_API_URL=$(node -p "require('./infra/outputs.json').GenerateScenarioStack.ApiBaseUrl")
+          API_KEY_ID=$(node -p "require('./infra/outputs.json').GenerateScenarioStack.ApiKeyId")
+          export LAMBDA_API_KEY=$(aws apigateway get-api-key --api-key "$API_KEY_ID" --include-value --query value --output text)
 
-          echo "Calling $API_URL"
-          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST "$API_URL" \
-            -H "x-api-key: $API_KEY_VALUE" \
-            -H "Content-Type: application/json" \
-            -d '{"description":"Verify the page title is visible","suite":"demoqa"}')
-
-          echo "HTTP status: $STATUS"
-          cat /tmp/response.json
-          test "$STATUS" -eq 200
+          echo "Testing $LAMBDA_API_URL"
+          npx bddgen
+          npx playwright test --project=api --grep @lambda
