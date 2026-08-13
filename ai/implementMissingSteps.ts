@@ -1,11 +1,11 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import type Anthropic from '@anthropic-ai/sdk';
 import { extractPageObjectCatalog } from './pageObjectCatalog';
 import { readProbe, PROBE_MARKER } from './probeRuntime';
 import { insertPageObjectMember, replacePageObjectMethod, AI_MARKER_PREFIX, AI_UNVERIFIED_PREFIX } from './codeInsertion';
 import { groundGeneratedCode, matchesPattern, TODO_MARKER_PREFIX } from './grounding';
+import { runPlaywright } from './testRunner';
 import type { DomElementSummary, PageObjectDefinition, Suite } from './types';
 
 const MAX_ATTEMPTS = 3;
@@ -21,10 +21,6 @@ interface Plan {
   stepDefinitionCode: string;
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function extractJson<T>(text: string): T | null {
   const match = text.match(/```json\n([\s\S]*?)```/) ?? text.match(/{[\s\S]*}/);
   if (!match) return null;
@@ -35,7 +31,7 @@ function extractJson<T>(text: string): T | null {
   }
 }
 
-function extractCode(text: string): string | null {
+export function extractCode(text: string): string | null {
   const match = text.match(/```typescript\n([\s\S]*?)```/) ?? text.match(/```ts\n([\s\S]*?)```/);
   return match ? match[1].trim() : null;
 }
@@ -50,7 +46,7 @@ function formatDigest(digest: DomElementSummary[]): string {
   return digest.map((d) => `- ${d.suggestedLocator}${d.accessibleName ? `  // "${d.accessibleName}"` : ''}`).join('\n');
 }
 
-async function askClaude(anthropic: Anthropic, model: string, system: string, user: string): Promise<string> {
+export async function askClaude(anthropic: Anthropic, model: string, system: string, user: string): Promise<string> {
   const response = await anthropic.messages.create({
     model,
     max_tokens: 2048,
@@ -128,29 +124,6 @@ ${previousError ? `\nThe previous attempt failed when running the real test, wit
 
   const text = await askClaude(anthropic, model, system, user);
   return extractCode(text);
-}
-
-// spawnSync('npx.cmd', [...]) without shell throws EINVAL on Windows (a known Node bug when
-// spawning .cmd files directly). shell:true with an args array doesn't work either: Node only
-// concatenates, it doesn't quote, so "Sort products from highest to lowest price" would get
-// split into loose arguments and --grep ended up matching any scenario with "Sort" in it. The
-// fix that works on both systems: a single command string with shell:true, quoting the --grep
-// value by hand.
-function shQuote(value: string): string {
-  return `"${value.replace(/"/g, '\\"')}"`;
-}
-
-function runPlaywright(repoRoot: string, grepTitle: string): { exitCode: number; output: string } {
-  const bddgen = spawnSync('npx bddgen', [], { cwd: repoRoot, encoding: 'utf-8', shell: true });
-  // Chromium only: the probe/retry loop runs the scenario several times, no need to pay for
-  // 3 browsers per attempt — the final cross-browser check is `npm test`'s job.
-  const testCmd = `npx playwright test --grep ${shQuote(escapeRegExp(grepTitle))} --project=chromium --reporter=line`;
-  const test = spawnSync(testCmd, [], { cwd: repoRoot, encoding: 'utf-8', shell: true });
-  // Not truncated: probe-marker detection searches the whole output. Whoever sends it into a
-  // prompt (generateMethodBody) truncates only there, to avoid risking cutting off the marker.
-  const errorText = [bddgen.error?.message, test.error?.message].filter(Boolean).join('\n');
-  const output = `${bddgen.stdout ?? ''}${bddgen.stderr ?? ''}${test.stdout ?? ''}${test.stderr ?? ''}${errorText}`;
-  return { exitCode: test.error ? 1 : (test.status ?? 1), output };
 }
 
 function extractScenarioTitle(featureText: string): string | null {

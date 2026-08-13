@@ -83,13 +83,16 @@ function insertConstructorAssignment(content: string, className: string, assignm
 /**
  * Looks up a method (by name) inside the class, including an AI marker comment immediately
  * above it if present, so it can be replaced whole (stub -> real implementation, or failed
- * implementation -> new attempt).
+ * implementation -> new attempt). `bodyOpenBrace` is exposed separately (not just `start`) so
+ * callers that only need to insert right after the opening `{` — e.g. insertProbeAtMethodStart
+ * — don't have to re-derive it, which matters because a naive "first '{' after start" search
+ * would misfire on a method whose parameter list itself destructures an object.
  */
 function findMethodBoundaries(
   content: string,
   className: string,
   methodName: string,
-): { start: number; end: number } | null {
+): { start: number; end: number; bodyOpenBrace: number } | null {
   const classRange = findClassRange(content, className);
   const classBody = content.slice(classRange.openBrace, classRange.closeBrace);
   const methodMatch = classBody.match(new RegExp(`async\\s+${methodName}\\s*\\([^)]*\\)[^{]*{`));
@@ -109,7 +112,23 @@ function findMethodBoundaries(
     if (prevLine.startsWith('//')) start = prevLineStart;
   }
 
-  return { start, end: methodCloseBrace + 1 };
+  return { start, end: methodCloseBrace + 1, bodyOpenBrace: methodOpenBrace };
+}
+
+/** Finds the `this.<fieldName> = ...;` statement inside the class's constructor. */
+function findConstructorAssignmentRange(
+  content: string,
+  className: string,
+  fieldName: string,
+): { start: number; end: number } | null {
+  const classRange = findClassRange(content, className);
+  const ctorRange = findConstructorRange(content, classRange);
+  const ctorBody = content.slice(ctorRange.openBrace, ctorRange.closeBrace);
+  const assignmentMatch = ctorBody.match(new RegExp(`^[ \\t]*this\\.${fieldName}\\s*=.*;[ \\t]*$`, 'm'));
+  if (!assignmentMatch || assignmentMatch.index === undefined) return null;
+
+  const start = ctorRange.openBrace + assignmentMatch.index;
+  return { start, end: start + assignmentMatch[0].length };
 }
 
 export interface NewPageObjectMember {
@@ -155,5 +174,47 @@ export function replacePageObjectMethod(filePath: string, className: string, met
     .map((line) => (line.trim() ? `  ${line}` : line))
     .join('\n');
   const updated = `${content.slice(0, boundaries.start)}${indentedMethod}${content.slice(boundaries.end)}`;
+  writeFileSync(filePath, updated, 'utf-8');
+}
+
+/**
+ * Self-healing: replaces an existing `this.<fieldName> = ...;` constructor assignment (the real
+ * shape locators take in this repo's Page Objects — see LoginPage.ts) with a corrected one.
+ * Unlike replacePageObjectMethod, there's no marker comment convention for a single-line field
+ * assignment — the PR the healer opens is the audit trail instead.
+ */
+export function replaceConstructorAssignment(filePath: string, className: string, fieldName: string, newAssignmentLine: string): void {
+  const content = readFileSync(filePath, 'utf-8');
+  const range = findConstructorAssignmentRange(content, className, fieldName);
+  if (!range) {
+    throw new Error(`Could not find "this.${fieldName} = ...;" in the constructor of class "${className}"`);
+  }
+  const indentMatch = content.slice(range.start, range.end).match(/^[ \t]*/);
+  const indent = indentMatch ? indentMatch[0] : '    ';
+  const updated = `${content.slice(0, range.start)}${indent}${newAssignmentLine.trim()}${content.slice(range.end)}`;
+  writeFileSync(filePath, updated, 'utf-8');
+}
+
+/**
+ * Self-healing probe: inserts `await captureProbe(this.page, probeId);` as the first statement
+ * of an EXISTING method (unlike insertPageObjectMember, which only ever adds brand-new members).
+ * Running the scenario afterward captures the real DOM at the exact point the broken locator
+ * would have been used — same probe/throw/capture mechanism implementMissingSteps.ts relies on,
+ * applied to "diagnose an existing failure" instead of "stub out a new one." Callers are
+ * responsible for snapshotting the original file content before calling this and restoring it
+ * once the digest has been captured (this function has no matching "revert").
+ */
+export function insertProbeAtMethodStart(filePath: string, className: string, methodName: string, probeId: string, probeImportLine: string): void {
+  let content = readFileSync(filePath, 'utf-8');
+  content = ensureImport(content, probeImportLine);
+
+  const boundaries = findMethodBoundaries(content, className, methodName);
+  if (!boundaries) {
+    throw new Error(`Could not find method "${methodName}" in class "${className}" to probe`);
+  }
+
+  const insertAt = boundaries.bodyOpenBrace + 1;
+  const probeStatement = `\n    await captureProbe(this.page, '${probeId}');`;
+  const updated = `${content.slice(0, insertAt)}${probeStatement}${content.slice(insertAt)}`;
   writeFileSync(filePath, updated, 'utf-8');
 }

@@ -170,6 +170,27 @@ Where the new code ends up:
 
 **Known limitation:** if the missing step is the first step of the scenario (no earlier steps leave the page in the right state), the probe has no way to reach a deeper state than the suite's `baseURL`. This isn't solved with a navigation "recipe" system in this version.
 
+## Self-healing locators (`ai/healLocators.ts`)
+
+A different failure mode than the one above: not a *missing* step, but an *existing, already-passing* scenario whose locator stopped matching the real DOM (the site renamed an id, restructured a form, etc.). When the CI run in `.github/workflows/playwright.yml` fails, a self-healing pass triages the failures and — for the ones it's actually confident about — opens a PR with a grounded fix. It never pushes to `main` directly and never auto-merges.
+
+**Planner → Generator → Healer, applied to a repair instead of a generation:**
+
+1. **Planner** (`ai/locatorFailure.ts#classifyFailure`): reads the full Playwright error and checks whether it's genuinely a locator-not-found/timeout failure (Playwright's own error echoes the locator back, e.g. `waiting for locator('#user-name')`). Anything else — a content assertion, a network error, an application bug — is left completely untouched. This is the guardrail against the risk the term "self-healing" usually raises: it only ever acts on "this selector doesn't resolve," never on "this test's expectations don't match reality."
+2. The broken locator string is mapped back to its Page Object field (`ai/pageObjectCatalog.ts#findLocatorField` — real Page Objects here assign locators once as constructor fields, e.g. `this.username = page.locator('#user-name');`, so this is a source grep, not a guess).
+3. **Generator (probe)**: the same DOM-capture mechanism as `--implement-missing` (`ai/domProbe.ts`, `ai/probeRuntime.ts`) is reused, but inserted into the *existing* method that uses the broken field (`ai/codeInsertion.ts#insertProbeAtMethodStart`) instead of a brand-new stub. The scenario is re-run once to capture the real DOM at the point of failure, then the file is restored to its original content before anything else happens.
+4. **Generator (fix)**: one Claude call, constrained to picking a replacement *literally* from that real digest (or explicitly saying `NONE` if nothing plausible matches) — verified again with the same `groundGeneratedCode` check used elsewhere, so an invented selector can't slip through. `NONE`, or a replacement that fails grounding, means the healer stops here: this reads as a real regression, not a rename.
+5. **Healer**: `ai/codeInsertion.ts#replaceConstructorAssignment` applies the fix, the scenario is re-run once more to verify it actually passes now. If it doesn't, the file is reverted and nothing is proposed — same "never leave an unverified change live" discipline as `--implement-missing`.
+6. Only if at least one locator was verified does `peter-evans/create-pull-request` open (or update) a PR on a single `ai/self-heal` branch, with the original failure text in the body and an explicit "review before merging" note.
+
+**Explicit non-goals:** doesn't run on `pull_request` events (only `push` to `main` / manual dispatch — avoids granting write-capable tokens to PR-triggered runs), doesn't touch the `api` suite (locators are a UI concept), and only considers the `chromium` project (cross-browser validation is `npm test`'s job).
+
+**Testing it locally** (there's no safe way to trigger a real breakage in CI on demand): deliberately break a real locator, e.g. in `pages/saucedemo/LoginPage.ts` change `page.locator('#user-name')` to a nonexistent id, run `npm test` (or just the affected suite) to produce a real failing `test-results/results.json`, then:
+```bash
+npm run heal:locators
+```
+Confirm it proposes the real selector back, applies it, and the re-run passes. Revert the deliberate breakage afterward — don't commit it.
+
 ## Lambda + API Gateway (`infra/`)
 
 The plain generator (no `--implement-missing`) is also deployed as a serverless AI microservice — the concrete "cloud-native AI application" piece:

@@ -15,6 +15,7 @@
     "report:exec": "tsx report/generateExecutiveReport.ts",
     "codegen": "playwright codegen",
     "ai:generate": "tsx ai/generateScenario.ts",
+    "heal:locators": "tsx ai/healLocators.ts",
     "api:install": "npm install --prefix api-server",
     "api:dev": "tsx api-server/src/index.ts",
     "docker:build": "docker compose build",

@@ -7,6 +7,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Default is read-only. Write access is only actually exercised by the self-healing steps below
+# (push a branch, open a PR) — those steps additionally check `github.event_name != 'pull_request'`
+# so a PR's own CI run never attempts to push anything, regardless of this grant.
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   test:
     timeout-minutes: 30
@@ -70,3 +77,36 @@ jobs:
           name: cucumber-report
           path: cucumber-report/
           retention-days: 14
+
+      # Self-healing: only on a real failure, and only on push/manual runs — never on a PR's own
+      # CI (see the `permissions:` comment above). Browsers aren't installed on the bare runner
+      # otherwise (the happy path runs entirely in Docker), so that's done here, not unconditionally.
+      - name: Install Playwright browser (for self-healing)
+        if: ${{ failure() && github.event_name != 'pull_request' }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Attempt to self-heal broken locators
+        if: ${{ failure() && github.event_name != 'pull_request' }}
+        run: npm run heal:locators
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      # No-ops cleanly if heal:locators changed nothing. Reuses one branch across runs so a
+      # still-open healing PR gets updated instead of spawning a new one each time.
+      - name: Open a PR with any healed locators
+        if: ${{ failure() && github.event_name != 'pull_request' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ai/self-heal
+          commit-message: 'Self-heal: repair broken locator(s) detected in CI'
+          title: '🤖 Self-heal: broken locator(s) detected'
+          body: |
+            Opened automatically by the self-healing step in `playwright.yml` after a CI failure.
+
+            **Review before merging** — this changes a selector based on the AI's best match
+            against the real DOM at failure time, grounded so nothing was invented, but it does
+            **not** guarantee the underlying UI change wasn't a real regression. Check the linked
+            run's logs (search for "healed") for the full diagnosis per locator.
+
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          add-paths: pages/**
