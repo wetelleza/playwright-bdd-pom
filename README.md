@@ -209,14 +209,21 @@ npm run synth   # builds the bundle, then `cdk synth` — validates the whole st
        "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
        "Action": "sts:AssumeRoleWithWebIdentity",
        "Condition": {
-         "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-         "StringLike": { "token.actions.githubusercontent.com:sub": "repo:wetelleza/playwright-bdd-pom:ref:refs/heads/main" }
+         "StringEquals": {
+           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+           "token.actions.githubusercontent.com:sub": "repo:wetelleza/playwright-bdd-pom:ref:refs/heads/main"
+         }
        }
      }]
    }
    JSON
    aws iam create-role --role-name github-deploy-playwright-bdd-pom --assume-role-policy-document file://trust-policy.json
    aws iam attach-role-policy --role-name github-deploy-playwright-bdd-pom --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+   ```
+   **Note:** some GitHub accounts issue OIDC tokens whose `sub` claim embeds the numeric owner/repo IDs (e.g. `repo:org@123/repo@456:ref:refs/heads/main`) instead of the plain-name form above. If `AssumeRoleWithWebIdentity` fails with `Not authorized` even though the trust policy looks right, add a debug step to the workflow that decodes the actual token and prints its claims before assuming any role, then update the `sub` condition to match exactly what GitHub sent:
+   ```bash
+   TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
+   node -e "console.log(JSON.parse(Buffer.from(process.argv[1].split('.')[1],'base64url').toString('utf8')))" "$TOKEN"
    ```
 3. Add two repository secrets (Settings → Secrets and variables → Actions): `AWS_DEPLOY_ROLE_ARN` (the role's ARN from step 2) and `ANTHROPIC_API_KEY` (the same Claude key already used locally).
 4. Push to `main` (touching `infra/**` or `ai/**`), or run the workflow manually — it builds, deploys, and smoke-tests the live endpoint.
