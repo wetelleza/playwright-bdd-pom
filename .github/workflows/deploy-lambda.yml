@@ -60,22 +60,6 @@ jobs:
       # deployed endpoint actually answers (happy path, validation, auth), not just that
       # `cdk deploy` returned success. Runs at repo root: features/, steps/ and playwright.config.ts
       # all live there, not under infra/.
-      # Temporary — /catalog returned 403 to every call in the last run while /generate on the
-      # same key/stage succeeded, so print the raw response (AWS's error message distinguishes a
-      # bad-key rejection from a routing mismatch) instead of guessing. Remove once diagnosed.
-      - name: Debug catalog endpoint
-        run: |
-          export LAMBDA_API_URL=$(node -p "require('./infra/outputs.json').GenerateScenarioStack.ApiBaseUrl")
-          API_KEY_ID=$(node -p "require('./infra/outputs.json').GenerateScenarioStack.ApiKeyId")
-          export LAMBDA_API_KEY=$(aws apigateway get-api-key --api-key "$API_KEY_ID" --include-value --query value --output text)
-          echo "GET ${LAMBDA_API_URL}catalog?suite=demoqa"
-          curl -sS -i -H "x-api-key: $LAMBDA_API_KEY" "${LAMBDA_API_URL}catalog?suite=demoqa"
-          echo ""
-          echo "--- for comparison, POST generate with the same key ---"
-          curl -sS -i -H "x-api-key: $LAMBDA_API_KEY" -H "Content-Type: application/json" \
-            -d '{"description":"Verify the page title is visible","suite":"demoqa"}' \
-            "${LAMBDA_API_URL}generate"
-
       - name: Test the deployed endpoint
         run: |
           export LAMBDA_API_URL=$(node -p "require('./infra/outputs.json').GenerateScenarioStack.ApiBaseUrl")
