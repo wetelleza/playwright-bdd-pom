@@ -24,6 +24,20 @@ jobs:
         with:
           node-version: 20
 
+      # Temporary — prints the exact `sub`/`aud`/`iss` claims GitHub's OIDC token actually
+      # carries, so we can compare them against the IAM trust policy byte-for-byte instead of
+      # guessing. Remove once the AssumeRoleWithWebIdentity failure is resolved.
+      - name: Debug OIDC token claims
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
+          node -e "const p=process.argv[1].split('.')[1]; console.log(JSON.stringify(JSON.parse(Buffer.from(p,'base64url').toString('utf8')),null,2))" "$TOKEN"
+          echo "Role ARN secret length: ${#ROLE_ARN}"
+          echo "Role ARN secret (safe to show, it's not sensitive): $ROLE_ARN"
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+          ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
